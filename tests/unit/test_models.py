@@ -1,9 +1,6 @@
 """Tests for the Pydantic models."""
 
-import pytest
-
 from search_ads_api.models import (
-    Campaign,
     CampaignCreate,
     CampaignStatus,
     CampaignSupplySource,
