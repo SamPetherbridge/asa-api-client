@@ -1,5 +1,10 @@
 # Search Ads API
 
+[![PyPI version](https://img.shields.io/pypi/v/search-ads-api.svg)](https://pypi.org/project/search-ads-api/)
+[![Python](https://img.shields.io/pypi/pyversions/search-ads-api.svg)](https://pypi.org/project/search-ads-api/)
+[![License](https://img.shields.io/github/license/SamPetherbridge/search-ads-api.svg)](https://github.com/SamPetherbridge/search-ads-api/blob/main/LICENSE)
+[![CI](https://github.com/SamPetherbridge/search-ads-api/actions/workflows/ci.yml/badge.svg)](https://github.com/SamPetherbridge/search-ads-api/actions/workflows/ci.yml)
+
 A modern, fully-typed Python client for the Apple Search Ads API with async support and Pydantic models.
 
 ## Features
@@ -13,13 +18,24 @@ A modern, fully-typed Python client for the Apple Search Ads API with async supp
 
 ## Installation
 
+Using [uv](https://docs.astral.sh/uv/) (recommended):
+
+```bash
+uv add search-ads-api
+```
+
+Using pip:
+
 ```bash
 pip install search-ads-api
 ```
 
 With pandas support:
+
 ```bash
-pip install search-ads-api[pandas]
+uv add "search-ads-api[pandas]"
+# or
+pip install "search-ads-api[pandas]"
 ```
 
 ## Quick Start
@@ -160,6 +176,16 @@ async def main():
             print(campaign.name)
 
 asyncio.run(main())
+```
+
+## CLI
+
+For a command-line interface, install [search-ads-cli](https://github.com/SamPetherbridge/search-ads-cli):
+
+```bash
+uv add search-ads-cli
+# or
+pip install search-ads-cli
 ```
 
 ## License
