@@ -3,6 +3,7 @@
 Provides methods for creating and retrieving impression share reports.
 """
 
+import asyncio
 import builtins
 import csv
 import io
@@ -12,13 +13,20 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from asa_api_client.exceptions import NetworkError
+from asa_api_client.exceptions import AppleSearchAdsError, NetworkError
 from asa_api_client.logging import get_logger
 from asa_api_client.models.reports import (
     GranularityType,
     ImpressionShareDateRange,
     ImpressionShareReport,
     ImpressionShareReportRow,
+)
+from asa_api_client.resources.base import (
+    DEFAULT_BACKOFF_FACTOR,
+    DEFAULT_INITIAL_DELAY,
+    DEFAULT_MAX_DELAY,
+    DEFAULT_MAX_RETRIES,
+    RETRYABLE_STATUS_CODES,
 )
 
 if TYPE_CHECKING:
@@ -114,6 +122,38 @@ class CustomReportResource:
             "Content-Type": "application/json",
         }
 
+    def _calculate_retry_delay(
+        self,
+        attempt: int,
+        response: httpx.Response | None = None,
+    ) -> float:
+        """Calculate delay before next retry attempt.
+
+        Args:
+            attempt: Current attempt number (0-indexed).
+            response: The HTTP response (to check Retry-After header).
+
+        Returns:
+            Delay in seconds before next retry.
+        """
+        if response is not None:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    return min(float(retry_after), DEFAULT_MAX_DELAY)
+                except ValueError:
+                    pass
+        delay = DEFAULT_INITIAL_DELAY * (DEFAULT_BACKOFF_FACTOR**attempt)
+        return min(delay, DEFAULT_MAX_DELAY)
+
+    def _handle_error(self, response: httpx.Response) -> None:
+        """Handle an error response from the API."""
+        from asa_api_client.resources.base import BaseResource
+
+        base = BaseResource.__new__(BaseResource)
+        base._client = self._client
+        base._handle_error(response)
+
     def _request(
         self,
         method: str,
@@ -121,28 +161,63 @@ class CustomReportResource:
         *,
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> dict[str, Any]:
-        """Make a synchronous API request."""
+        """Make a synchronous API request with automatic retry.
+
+        Automatically retries on rate limiting (429) and server errors (5xx)
+        with exponential backoff.
+        """
         url = self._build_url(path)
         headers = self._get_headers()
         logger.debug("%s %s", method, url)
-        try:
-            response = self._http_client.request(
-                method, url, json=json, params=params, headers=headers
-            )
-        except httpx.RequestError as e:
-            raise NetworkError(f"Request failed: {e}") from e
-        if response.status_code >= 400:
-            from asa_api_client.resources.base import BaseResource
 
-            # Use base resource error handling
-            base = BaseResource.__new__(BaseResource)
-            base._client = self._client
-            base._handle_error(response)
-        if response.status_code == 204:
-            return {}
-        result: dict[str, Any] = response.json()
-        return result
+        last_exception: AppleSearchAdsError | None = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = self._http_client.request(
+                    method, url, json=json, params=params, headers=headers
+                )
+            except httpx.RequestError as e:
+                if attempt < max_retries:
+                    delay = self._calculate_retry_delay(attempt)
+                    logger.warning(
+                        "Request failed (attempt %d/%d), retrying in %.1fs: %s",
+                        attempt + 1,
+                        max_retries + 1,
+                        delay,
+                        str(e),
+                    )
+                    time.sleep(delay)
+                    continue
+                raise NetworkError(f"Request failed: {e}") from e
+
+            # Check if we should retry based on status code
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+                delay = self._calculate_retry_delay(attempt, response)
+                logger.warning(
+                    "Received %d (attempt %d/%d), retrying in %.1fs",
+                    response.status_code,
+                    attempt + 1,
+                    max_retries + 1,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
+
+            if response.status_code >= 400:
+                self._handle_error(response)
+
+            if response.status_code == 204:
+                return {}
+
+            result: dict[str, Any] = response.json()
+            return result
+
+        if last_exception:
+            raise last_exception
+        raise NetworkError("Request failed after all retries")
 
     async def _request_async(
         self,
@@ -151,27 +226,63 @@ class CustomReportResource:
         *,
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> dict[str, Any]:
-        """Make an asynchronous API request."""
+        """Make an asynchronous API request with automatic retry.
+
+        Automatically retries on rate limiting (429) and server errors (5xx)
+        with exponential backoff.
+        """
         url = self._build_url(path)
         headers = await self._get_headers_async()
         logger.debug("%s %s (async)", method, url)
-        try:
-            response = await self._async_http_client.request(
-                method, url, json=json, params=params, headers=headers
-            )
-        except httpx.RequestError as e:
-            raise NetworkError(f"Request failed: {e}") from e
-        if response.status_code >= 400:
-            from asa_api_client.resources.base import BaseResource
 
-            base = BaseResource.__new__(BaseResource)
-            base._client = self._client
-            base._handle_error(response)
-        if response.status_code == 204:
-            return {}
-        result: dict[str, Any] = response.json()
-        return result
+        last_exception: AppleSearchAdsError | None = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = await self._async_http_client.request(
+                    method, url, json=json, params=params, headers=headers
+                )
+            except httpx.RequestError as e:
+                if attempt < max_retries:
+                    delay = self._calculate_retry_delay(attempt)
+                    logger.warning(
+                        "Request failed (attempt %d/%d), retrying in %.1fs: %s",
+                        attempt + 1,
+                        max_retries + 1,
+                        delay,
+                        str(e),
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise NetworkError(f"Request failed: {e}") from e
+
+            # Check if we should retry based on status code
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+                delay = self._calculate_retry_delay(attempt, response)
+                logger.warning(
+                    "Received %d (attempt %d/%d), retrying in %.1fs",
+                    response.status_code,
+                    attempt + 1,
+                    max_retries + 1,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            if response.status_code >= 400:
+                self._handle_error(response)
+
+            if response.status_code == 204:
+                return {}
+
+            result: dict[str, Any] = response.json()
+            return result
+
+        if last_exception:
+            raise last_exception
+        raise NetworkError("Request failed after all retries")
 
     def list_reports(
         self, limit: int = 100, offset: int = 0
