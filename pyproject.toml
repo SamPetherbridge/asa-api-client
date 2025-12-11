@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asa-api-client"
-version = "0.1.2"
+version = "0.1.3"
 description = "A modern Python client for the Apple Search Ads API with full type safety and async support"
 readme = "README.md"
 license = "MIT"
@@ -115,7 +115,6 @@ select = [
 ignore = [
     "D100",   # Missing docstring in public module
     "D104",   # Missing docstring in public package
-    "UP046",  # Generic class uses Generic subclass instead of type params (requires invasive changes)
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -4,6 +4,8 @@ This module provides the base infrastructure for all resource classes,
 including HTTP request handling, error mapping, and pagination.
 """
 
+import asyncio
+import time
 from collections.abc import AsyncIterator, Iterator
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
@@ -31,6 +33,13 @@ logger = get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 CreateT = TypeVar("CreateT", bound=BaseModel)
 UpdateT = TypeVar("UpdateT", bound=BaseModel)
+
+# Retry configuration
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_INITIAL_DELAY = 1.0  # seconds
+DEFAULT_MAX_DELAY = 60.0  # seconds
+DEFAULT_BACKOFF_FACTOR = 2.0
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class BaseResource(Generic[T, CreateT, UpdateT]):
@@ -200,6 +209,35 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
             response_body=error_body,
         )
 
+    def _calculate_retry_delay(
+        self,
+        attempt: int,
+        response: httpx.Response | None = None,
+    ) -> float:
+        """Calculate delay before next retry attempt.
+
+        Uses exponential backoff, respecting Retry-After header if present.
+
+        Args:
+            attempt: Current attempt number (0-indexed).
+            response: The HTTP response (to check Retry-After header).
+
+        Returns:
+            Delay in seconds before next retry.
+        """
+        # Check for Retry-After header
+        if response is not None:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    return min(float(retry_after), DEFAULT_MAX_DELAY)
+                except ValueError:
+                    pass
+
+        # Exponential backoff with jitter
+        delay = DEFAULT_INITIAL_DELAY * (DEFAULT_BACKOFF_FACTOR**attempt)
+        return min(delay, DEFAULT_MAX_DELAY)
+
     def _request(
         self,
         method: str,
@@ -207,45 +245,82 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
         *,
         json: dict[str, Any] | list[dict[str, Any]] | None = None,
         params: dict[str, Any] | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> dict[str, Any]:
-        """Make a synchronous API request.
+        """Make a synchronous API request with automatic retry.
+
+        Automatically retries on rate limiting (429) and server errors (5xx)
+        with exponential backoff.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE).
             path: URL path to append to base_path.
             json: JSON body to send.
             params: Query parameters.
+            max_retries: Maximum number of retry attempts.
 
         Returns:
             The parsed JSON response.
 
         Raises:
-            AppleSearchAdsError: If the request fails.
+            AppleSearchAdsError: If the request fails after all retries.
         """
         url = self._build_url(path)
         headers = self._get_headers()
 
         logger.debug("%s %s", method, url)
 
-        try:
-            response = self._http_client.request(
-                method,
-                url,
-                json=json,
-                params=params,
-                headers=headers,
-            )
-        except httpx.RequestError as e:
-            raise NetworkError(f"Request failed: {e}") from e
+        last_exception: AppleSearchAdsError | None = None
 
-        if response.status_code >= 400:
-            self._handle_error(response)
+        for attempt in range(max_retries + 1):
+            try:
+                response = self._http_client.request(
+                    method,
+                    url,
+                    json=json,
+                    params=params,
+                    headers=headers,
+                )
+            except httpx.RequestError as e:
+                if attempt < max_retries:
+                    delay = self._calculate_retry_delay(attempt)
+                    logger.warning(
+                        "Request failed (attempt %d/%d), retrying in %.1fs: %s",
+                        attempt + 1,
+                        max_retries + 1,
+                        delay,
+                        str(e),
+                    )
+                    time.sleep(delay)
+                    continue
+                raise NetworkError(f"Request failed: {e}") from e
 
-        if response.status_code == 204:
-            return {}
+            # Check if we should retry based on status code
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+                delay = self._calculate_retry_delay(attempt, response)
+                logger.warning(
+                    "Received %d (attempt %d/%d), retrying in %.1fs",
+                    response.status_code,
+                    attempt + 1,
+                    max_retries + 1,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
 
-        result: dict[str, Any] = response.json()
-        return result
+            if response.status_code >= 400:
+                self._handle_error(response)
+
+            if response.status_code == 204:
+                return {}
+
+            result: dict[str, Any] = response.json()
+            return result
+
+        # This should not be reached, but handle it just in case
+        if last_exception:
+            raise last_exception
+        raise NetworkError("Request failed after all retries")
 
     async def _request_async(
         self,
@@ -254,45 +329,82 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
         *,
         json: dict[str, Any] | list[dict[str, Any]] | None = None,
         params: dict[str, Any] | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> dict[str, Any]:
-        """Make an asynchronous API request.
+        """Make an asynchronous API request with automatic retry.
+
+        Automatically retries on rate limiting (429) and server errors (5xx)
+        with exponential backoff.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE).
             path: URL path to append to base_path.
             json: JSON body to send.
             params: Query parameters.
+            max_retries: Maximum number of retry attempts.
 
         Returns:
             The parsed JSON response.
 
         Raises:
-            AppleSearchAdsError: If the request fails.
+            AppleSearchAdsError: If the request fails after all retries.
         """
         url = self._build_url(path)
         headers = await self._get_headers_async()
 
         logger.debug("%s %s (async)", method, url)
 
-        try:
-            response = await self._async_http_client.request(
-                method,
-                url,
-                json=json,
-                params=params,
-                headers=headers,
-            )
-        except httpx.RequestError as e:
-            raise NetworkError(f"Request failed: {e}") from e
+        last_exception: AppleSearchAdsError | None = None
 
-        if response.status_code >= 400:
-            self._handle_error(response)
+        for attempt in range(max_retries + 1):
+            try:
+                response = await self._async_http_client.request(
+                    method,
+                    url,
+                    json=json,
+                    params=params,
+                    headers=headers,
+                )
+            except httpx.RequestError as e:
+                if attempt < max_retries:
+                    delay = self._calculate_retry_delay(attempt)
+                    logger.warning(
+                        "Request failed (attempt %d/%d), retrying in %.1fs: %s",
+                        attempt + 1,
+                        max_retries + 1,
+                        delay,
+                        str(e),
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise NetworkError(f"Request failed: {e}") from e
 
-        if response.status_code == 204:
-            return {}
+            # Check if we should retry based on status code
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+                delay = self._calculate_retry_delay(attempt, response)
+                logger.warning(
+                    "Received %d (attempt %d/%d), retrying in %.1fs",
+                    response.status_code,
+                    attempt + 1,
+                    max_retries + 1,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
 
-        result: dict[str, Any] = response.json()
-        return result
+            if response.status_code >= 400:
+                self._handle_error(response)
+
+            if response.status_code == 204:
+                return {}
+
+            result: dict[str, Any] = response.json()
+            return result
+
+        # This should not be reached, but handle it just in case
+        if last_exception:
+            raise last_exception
+        raise NetworkError("Request failed after all retries")
 
     def _parse_response(self, data: dict[str, Any]) -> T:
         """Parse a single item response.
