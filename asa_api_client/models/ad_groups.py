@@ -10,7 +10,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
-from search_ads_api.models.base import Money
+from asa_api_client.models.base import Money
 
 
 class AdGroupStatus(StrEnum):

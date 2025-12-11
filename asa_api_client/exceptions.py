@@ -7,8 +7,8 @@ interacting with the Apple Search Ads API. All exceptions inherit from
 Example:
     Handling specific exceptions::
 
-        from search_ads_api import AppleSearchAdsClient
-        from search_ads_api.exceptions import NotFoundError, RateLimitError
+        from asa_api_client import AppleSearchAdsClient
+        from asa_api_client.exceptions import NotFoundError, RateLimitError
 
         client = AppleSearchAdsClient(...)
 
@@ -161,7 +161,7 @@ class RateLimitError(AppleSearchAdsError):
         Handling rate limits::
 
             import time
-            from search_ads_api.exceptions import RateLimitError
+            from asa_api_client.exceptions import RateLimitError
 
             try:
                 campaigns = client.campaigns.list()

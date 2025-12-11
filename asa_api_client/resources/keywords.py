@@ -7,18 +7,18 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from search_ads_api.models.base import PaginatedResponse
-from search_ads_api.models.keywords import (
+from asa_api_client.models.base import PaginatedResponse
+from asa_api_client.models.keywords import (
     Keyword,
     KeywordCreate,
     KeywordUpdate,
     NegativeKeyword,
     NegativeKeywordCreate,
 )
-from search_ads_api.resources.base import WritableResource
+from asa_api_client.resources.base import WritableResource
 
 if TYPE_CHECKING:
-    from search_ads_api.client import AppleSearchAdsClient
+    from asa_api_client.client import AppleSearchAdsClient
 
 
 class KeywordResource(WritableResource[Keyword, KeywordCreate, KeywordUpdate]):
@@ -34,7 +34,7 @@ class KeywordResource(WritableResource[Keyword, KeywordCreate, KeywordUpdate]):
 
         Create a keyword::
 
-            from search_ads_api.models import KeywordCreate, KeywordMatchType, Money
+            from asa_api_client.models import KeywordCreate, KeywordMatchType, Money
 
             keyword = client.campaigns(123).ad_groups(456).keywords.create(
                 KeywordCreate(

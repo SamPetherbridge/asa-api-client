@@ -1,6 +1,6 @@
 """Tests for the Pydantic models."""
 
-from search_ads_api.models import (
+from asa_api_client.models import (
     CampaignCreate,
     CampaignStatus,
     CampaignSupplySource,

@@ -16,7 +16,7 @@ AppleSearchAdsError
 Base exception for all API errors.
 
 ```python
-from search_ads_api import AppleSearchAdsError
+from asa_api_client import AppleSearchAdsError
 
 try:
     client.campaigns.list()
@@ -29,7 +29,7 @@ except AppleSearchAdsError as e:
 Raised when authentication fails.
 
 ```python
-from search_ads_api import AuthenticationError
+from asa_api_client import AuthenticationError
 
 try:
     client.campaigns.list()
@@ -42,7 +42,7 @@ except AuthenticationError:
 Raised when client configuration is invalid.
 
 ```python
-from search_ads_api import ConfigurationError
+from asa_api_client import ConfigurationError
 
 try:
     client = AppleSearchAdsClient(...)
@@ -55,7 +55,7 @@ except ConfigurationError as e:
 Raised when a resource is not found.
 
 ```python
-from search_ads_api import NotFoundError
+from asa_api_client import NotFoundError
 
 try:
     campaign = client.campaigns.get(123)
@@ -68,7 +68,7 @@ except NotFoundError:
 Raised when API rate limit is exceeded.
 
 ```python
-from search_ads_api import RateLimitError
+from asa_api_client import RateLimitError
 
 try:
     client.campaigns.list()
@@ -81,7 +81,7 @@ except RateLimitError as e:
 Raised when request validation fails.
 
 ```python
-from search_ads_api import ValidationError
+from asa_api_client import ValidationError
 
 try:
     client.campaigns.create(invalid_data)

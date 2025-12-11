@@ -5,25 +5,25 @@
 [uv](https://docs.astral.sh/uv/) is a fast Python package manager:
 
 ```bash
-uv add search-ads-api
+uv add asa-api-client
 ```
 
 With pandas support for DataFrame exports:
 
 ```bash
-uv add "search-ads-api[pandas]"
+uv add "asa-api-client[pandas]"
 ```
 
 ## Using pip
 
 ```bash
-pip install search-ads-api
+pip install asa-api-client
 ```
 
 With pandas support:
 
 ```bash
-pip install "search-ads-api[pandas]"
+pip install "asa-api-client[pandas]"
 ```
 
 ## Requirements

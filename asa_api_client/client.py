@@ -10,10 +10,10 @@ from typing import Self
 
 import httpx
 
-from search_ads_api.auth import Authenticator
-from search_ads_api.logging import get_logger
-from search_ads_api.resources.campaigns import CampaignResource
-from search_ads_api.resources.reports import ReportResource
+from asa_api_client.auth import Authenticator
+from asa_api_client.logging import get_logger
+from asa_api_client.resources.campaigns import CampaignResource
+from asa_api_client.resources.reports import ReportResource
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class AppleSearchAdsClient:
     Example:
         Basic usage::
 
-            from search_ads_api import AppleSearchAdsClient
+            from asa_api_client import AppleSearchAdsClient
 
             client = AppleSearchAdsClient(
                 client_id="SEARCHADS.abc123",
@@ -54,7 +54,7 @@ class AppleSearchAdsClient:
                 print(f"{campaign.name}: {campaign.status}")
 
             # Create a campaign
-            from search_ads_api.models import CampaignCreate, Money, CampaignSupplySource
+            from asa_api_client.models import CampaignCreate, Money, CampaignSupplySource
 
             new_campaign = client.campaigns.create(
                 CampaignCreate(

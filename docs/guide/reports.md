@@ -41,7 +41,7 @@ report = client.reports.keywords(
 Reports support different time granularities:
 
 ```python
-from search_ads_api.models import ReportGranularity
+from asa_api_client.models import ReportGranularity
 
 # Daily breakdown
 report = client.reports.campaigns(

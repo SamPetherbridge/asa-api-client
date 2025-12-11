@@ -14,7 +14,7 @@ Example:
 
     Then load settings::
 
-        from search_ads_api.settings import Settings
+        from asa_api_client.settings import Settings
 
         settings = Settings()
         # Or specify a custom env file

@@ -6,7 +6,7 @@ with async support, Pydantic models, and comprehensive logging.
 Example:
     Basic usage with the client::
 
-        from search_ads_api import AppleSearchAdsClient
+        from asa_api_client import AppleSearchAdsClient
 
         client = AppleSearchAdsClient(
             client_id="your-client-id",
@@ -23,8 +23,8 @@ Example:
         campaigns = await client.campaigns.list_async()
 """
 
-from search_ads_api.client import AppleSearchAdsClient
-from search_ads_api.exceptions import (
+from asa_api_client.client import AppleSearchAdsClient
+from asa_api_client.exceptions import (
     AppleSearchAdsError,
     AuthenticationError,
     ConfigurationError,
@@ -32,8 +32,8 @@ from search_ads_api.exceptions import (
     RateLimitError,
     ValidationError,
 )
-from search_ads_api.logging import configure_logging
-from search_ads_api.settings import Settings
+from asa_api_client.logging import configure_logging
+from asa_api_client.settings import Settings
 
 __all__ = [
     "AppleSearchAdsClient",

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 import httpx
 from pydantic import BaseModel
 
-from search_ads_api.exceptions import (
+from asa_api_client.exceptions import (
     AppleSearchAdsError,
     AuthenticationError,
     AuthorizationError,
@@ -20,11 +20,11 @@ from search_ads_api.exceptions import (
     ServerError,
     ValidationError,
 )
-from search_ads_api.logging import get_logger
-from search_ads_api.models.base import PageDetail, PaginatedResponse, Selector
+from asa_api_client.logging import get_logger
+from asa_api_client.models.base import PageDetail, PaginatedResponse, Selector
 
 if TYPE_CHECKING:
-    from search_ads_api.client import AppleSearchAdsClient
+    from asa_api_client.client import AppleSearchAdsClient
 
 logger = get_logger(__name__)
 

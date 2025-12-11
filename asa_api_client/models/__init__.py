@@ -5,7 +5,7 @@ Apple Search Ads API. All models are Pydantic BaseModels with full
 type hints and validation.
 """
 
-from search_ads_api.models.ad_groups import (
+from asa_api_client.models.ad_groups import (
     AdGroup,
     AdGroupCreate,
     AdGroupDisplayStatus,
@@ -17,7 +17,7 @@ from search_ads_api.models.ad_groups import (
     CpaGoal,
     TargetingDimensions,
 )
-from search_ads_api.models.base import (
+from asa_api_client.models.base import (
     Condition,
     ConditionOperator,
     Money,
@@ -28,7 +28,7 @@ from search_ads_api.models.base import (
     Sorting,
     SortOrder,
 )
-from search_ads_api.models.campaigns import (
+from asa_api_client.models.campaigns import (
     AdChannelType,
     BillingEvent,
     Campaign,
@@ -41,7 +41,7 @@ from search_ads_api.models.campaigns import (
     CampaignSupplySource,
     CampaignUpdate,
 )
-from search_ads_api.models.keywords import (
+from asa_api_client.models.keywords import (
     Keyword,
     KeywordCreate,
     KeywordMatchType,
@@ -50,7 +50,7 @@ from search_ads_api.models.keywords import (
     NegativeKeyword,
     NegativeKeywordCreate,
 )
-from search_ads_api.models.reports import (
+from asa_api_client.models.reports import (
     GranularityType,
     ReportingRequest,
     ReportingResponse,

@@ -6,7 +6,7 @@ to control the verbosity and format of log output from the library.
 Example:
     Configure logging at application startup::
 
-        from search_ads_api import configure_logging
+        from asa_api_client import configure_logging
         import logging
 
         # Enable debug logging
@@ -61,7 +61,7 @@ def configure_logging(
     Example:
         Basic configuration::
 
-            from search_ads_api import configure_logging
+            from asa_api_client import configure_logging
             import logging
 
             configure_logging(level=logging.DEBUG)
@@ -120,7 +120,7 @@ def get_logger(name: str) -> logging.Logger:
     Example:
         In a module::
 
-            from search_ads_api.logging import get_logger
+            from asa_api_client.logging import get_logger
 
             logger = get_logger(__name__)
             logger.debug("Processing request")

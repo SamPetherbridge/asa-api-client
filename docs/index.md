@@ -14,19 +14,19 @@ A modern, fully-typed Python client for the Apple Search Ads API with async supp
 ## Installation
 
 ```bash
-uv add search-ads-api
+uv add asa-api-client
 ```
 
 Or with pip:
 
 ```bash
-pip install search-ads-api
+pip install asa-api-client
 ```
 
 ## Quick Example
 
 ```python
-from search_ads_api import AppleSearchAdsClient
+from asa_api_client import AppleSearchAdsClient
 
 client = AppleSearchAdsClient.from_env()
 

@@ -5,13 +5,13 @@ Provides methods for managing advertising campaigns.
 
 from typing import TYPE_CHECKING
 
-from search_ads_api.models.campaigns import Campaign, CampaignCreate, CampaignUpdate
-from search_ads_api.resources.base import WritableResource
+from asa_api_client.models.campaigns import Campaign, CampaignCreate, CampaignUpdate
+from asa_api_client.resources.base import WritableResource
 
 if TYPE_CHECKING:
-    from search_ads_api.client import AppleSearchAdsClient
-    from search_ads_api.resources.ad_groups import AdGroupResource
-    from search_ads_api.resources.keywords import NegativeKeywordResource
+    from asa_api_client.client import AppleSearchAdsClient
+    from asa_api_client.resources.ad_groups import AdGroupResource
+    from asa_api_client.resources.keywords import NegativeKeywordResource
 
 
 class CampaignResource(WritableResource[Campaign, CampaignCreate, CampaignUpdate]):
@@ -30,7 +30,7 @@ class CampaignResource(WritableResource[Campaign, CampaignCreate, CampaignUpdate
 
         Create a new campaign::
 
-            from search_ads_api.models import CampaignCreate, Money, CampaignSupplySource
+            from asa_api_client.models import CampaignCreate, Money, CampaignSupplySource
 
             campaign = client.campaigns.create(
                 CampaignCreate(
@@ -45,7 +45,7 @@ class CampaignResource(WritableResource[Campaign, CampaignCreate, CampaignUpdate
 
         Find enabled campaigns::
 
-            from search_ads_api.models import Selector
+            from asa_api_client.models import Selector
 
             enabled = client.campaigns.find(
                 Selector()
@@ -113,8 +113,8 @@ class CampaignContext:
         self.campaign_id = campaign_id
 
         # Import here to avoid circular imports
-        from search_ads_api.resources.ad_groups import AdGroupResource
-        from search_ads_api.resources.keywords import NegativeKeywordResource
+        from asa_api_client.resources.ad_groups import AdGroupResource
+        from asa_api_client.resources.keywords import NegativeKeywordResource
 
         self._ad_groups = AdGroupResource(client, campaign_id)
         self._negative_keywords = NegativeKeywordResource(
@@ -146,7 +146,7 @@ class CampaignContext:
         Example:
             Add negative keyword::
 
-                from search_ads_api.models import NegativeKeywordCreate, KeywordMatchType
+                from asa_api_client.models import NegativeKeywordCreate, KeywordMatchType
 
                 client.campaigns(123).negative_keywords.create(
                     NegativeKeywordCreate(

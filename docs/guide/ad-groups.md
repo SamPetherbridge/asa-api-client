@@ -17,7 +17,7 @@ ad_group = client.campaigns(campaign_id).ad_groups.get(ad_group_id)
 ## Find Ad Groups
 
 ```python
-from search_ads_api.models import Selector
+from asa_api_client.models import Selector
 
 active = client.campaigns(campaign_id).ad_groups.find(
     Selector().where("status", "==", "ENABLED")
@@ -27,7 +27,7 @@ active = client.campaigns(campaign_id).ad_groups.find(
 ## Create an Ad Group
 
 ```python
-from search_ads_api.models import AdGroupCreate, Money
+from asa_api_client.models import AdGroupCreate, Money
 
 ad_group = client.campaigns(campaign_id).ad_groups.create(
     AdGroupCreate(
@@ -40,7 +40,7 @@ ad_group = client.campaigns(campaign_id).ad_groups.create(
 ## Update an Ad Group
 
 ```python
-from search_ads_api.models import AdGroupUpdate
+from asa_api_client.models import AdGroupUpdate
 
 client.campaigns(campaign_id).ad_groups.update(
     ad_group_id,

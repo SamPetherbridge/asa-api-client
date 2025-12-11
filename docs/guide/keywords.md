@@ -17,7 +17,7 @@ keyword = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.get(keyw
 ## Find Keywords
 
 ```python
-from search_ads_api.models import Selector
+from asa_api_client.models import Selector
 
 active = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.find(
     Selector().where("status", "==", "ACTIVE")
@@ -29,7 +29,7 @@ active = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.find(
 Keywords are created in bulk:
 
 ```python
-from search_ads_api.models import KeywordCreate, KeywordMatchType, Money
+from asa_api_client.models import KeywordCreate, KeywordMatchType, Money
 
 result = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.create_bulk([
     KeywordCreate(
@@ -48,7 +48,7 @@ result = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.create_bu
 ## Update Keywords
 
 ```python
-from search_ads_api.models import KeywordUpdate
+from asa_api_client.models import KeywordUpdate
 
 client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.update_bulk([
     KeywordUpdate(

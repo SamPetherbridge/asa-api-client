@@ -5,10 +5,10 @@ different API endpoints. Each resource handles a specific entity
 type (campaigns, ad groups, keywords, etc.).
 """
 
-from search_ads_api.resources.ad_groups import AdGroupResource
-from search_ads_api.resources.campaigns import CampaignResource
-from search_ads_api.resources.keywords import KeywordResource, NegativeKeywordResource
-from search_ads_api.resources.reports import ReportResource
+from asa_api_client.resources.ad_groups import AdGroupResource
+from asa_api_client.resources.campaigns import CampaignResource
+from asa_api_client.resources.keywords import KeywordResource, NegativeKeywordResource
+from asa_api_client.resources.reports import ReportResource
 
 __all__ = [
     "AdGroupResource",

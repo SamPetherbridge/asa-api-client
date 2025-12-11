@@ -3,7 +3,7 @@
 ## Basic Usage
 
 ```python
-from search_ads_api import AppleSearchAdsClient
+from asa_api_client import AppleSearchAdsClient
 
 # Create client from environment variables
 client = AppleSearchAdsClient.from_env()
@@ -22,7 +22,7 @@ with client:
 Use the `Selector` class to filter results:
 
 ```python
-from search_ads_api.models import Selector
+from asa_api_client.models import Selector
 
 with client:
     # Find enabled campaigns
@@ -65,7 +65,7 @@ with client:
 ## Error Handling
 
 ```python
-from search_ads_api import (
+from asa_api_client import (
     AppleSearchAdsError,
     AuthenticationError,
     NotFoundError,

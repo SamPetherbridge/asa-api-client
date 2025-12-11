@@ -1,6 +1,6 @@
 # Client Reference
 
-::: search_ads_api.AppleSearchAdsClient
+::: asa_api_client.AppleSearchAdsClient
     options:
       show_root_heading: true
       show_source: false

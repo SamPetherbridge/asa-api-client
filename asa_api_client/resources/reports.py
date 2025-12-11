@@ -6,16 +6,16 @@ Provides methods for generating performance reports.
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
-from search_ads_api.logging import get_logger
-from search_ads_api.models.reports import (
+from asa_api_client.logging import get_logger
+from asa_api_client.models.reports import (
     GranularityType,
     ReportingRequest,
     ReportingResponse,
 )
-from search_ads_api.resources.base import BaseResource
+from asa_api_client.resources.base import BaseResource
 
 if TYPE_CHECKING:
-    from search_ads_api.client import AppleSearchAdsClient
+    from asa_api_client.client import AppleSearchAdsClient
 
 logger = get_logger(__name__)
 
@@ -30,7 +30,7 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
         Get a campaign report::
 
             from datetime import date
-            from search_ads_api.models import GranularityType
+            from asa_api_client.models import GranularityType
 
             report = client.reports.campaigns(
                 start_date=date(2024, 1, 1),

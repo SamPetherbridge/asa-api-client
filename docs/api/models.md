@@ -2,53 +2,53 @@
 
 ## Campaigns
 
-::: search_ads_api.models.Campaign
+::: asa_api_client.models.Campaign
     options:
       show_root_heading: true
       show_source: false
 
-::: search_ads_api.models.CampaignCreate
+::: asa_api_client.models.CampaignCreate
     options:
       show_root_heading: true
       show_source: false
 
-::: search_ads_api.models.CampaignUpdate
+::: asa_api_client.models.CampaignUpdate
     options:
       show_root_heading: true
       show_source: false
 
 ## Ad Groups
 
-::: search_ads_api.models.AdGroup
+::: asa_api_client.models.AdGroup
     options:
       show_root_heading: true
       show_source: false
 
-::: search_ads_api.models.AdGroupCreate
+::: asa_api_client.models.AdGroupCreate
     options:
       show_root_heading: true
       show_source: false
 
 ## Keywords
 
-::: search_ads_api.models.Keyword
+::: asa_api_client.models.Keyword
     options:
       show_root_heading: true
       show_source: false
 
-::: search_ads_api.models.KeywordCreate
+::: asa_api_client.models.KeywordCreate
     options:
       show_root_heading: true
       show_source: false
 
 ## Common
 
-::: search_ads_api.models.Money
+::: asa_api_client.models.Money
     options:
       show_root_heading: true
       show_source: false
 
-::: search_ads_api.models.Selector
+::: asa_api_client.models.Selector
     options:
       show_root_heading: true
       show_source: false

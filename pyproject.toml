@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "search-ads-api"
+name = "asa-api-client"
 version = "0.1.0"
 description = "A modern Python client for the Apple Search Ads API with full type safety and async support"
 readme = "README.md"
@@ -13,6 +13,7 @@ authors = [{ name = "Peth Pty Ltd", email = "hello@peth.com.au" }]
 keywords = [
     "apple",
     "search-ads",
+    "asa",
     "advertising",
     "api",
     "async",
@@ -63,7 +64,7 @@ Repository = "https://github.com/SamPetherbridge/search-ads-api"
 Issues = "https://github.com/SamPetherbridge/search-ads-api/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["search_ads_api"]
+packages = ["asa_api_client"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -121,7 +122,7 @@ ignore = [
 convention = "google"
 
 [tool.coverage.run]
-source = ["search_ads_api"]
+source = ["asa_api_client"]
 branch = true
 
 [tool.coverage.report]

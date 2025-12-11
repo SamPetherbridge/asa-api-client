@@ -18,8 +18,8 @@ from typing import Self
 import httpx
 import jwt
 
-from search_ads_api.exceptions import AuthenticationError, ConfigurationError, NetworkError
-from search_ads_api.logging import get_logger
+from asa_api_client.exceptions import AuthenticationError, ConfigurationError, NetworkError
+from asa_api_client.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -433,7 +433,7 @@ class Authenticator:
         """
         from pydantic import ValidationError
 
-        from search_ads_api.settings import Settings
+        from asa_api_client.settings import Settings
 
         try:
             if env_file is None:

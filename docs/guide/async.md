@@ -6,7 +6,7 @@ The client supports both synchronous and asynchronous operations.
 
 ```python
 import asyncio
-from search_ads_api import AppleSearchAdsClient
+from asa_api_client import AppleSearchAdsClient
 
 async def main():
     client = AppleSearchAdsClient.from_env()

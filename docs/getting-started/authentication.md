@@ -41,7 +41,7 @@ ASA_PRIVATE_KEY_PATH=private-key.pem
 You can also pass credentials directly:
 
 ```python
-from search_ads_api import AppleSearchAdsClient
+from asa_api_client import AppleSearchAdsClient
 
 client = AppleSearchAdsClient(
     client_id="SEARCHADS.xxx",

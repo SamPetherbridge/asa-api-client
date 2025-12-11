@@ -1,7 +1,7 @@
-# Search Ads API
+# ASA API Client
 
-[![PyPI version](https://img.shields.io/pypi/v/search-ads-api.svg)](https://pypi.org/project/search-ads-api/)
-[![Python](https://img.shields.io/pypi/pyversions/search-ads-api.svg)](https://pypi.org/project/search-ads-api/)
+[![PyPI version](https://img.shields.io/pypi/v/asa-api-client.svg)](https://pypi.org/project/asa-api-client/)
+[![Python](https://img.shields.io/pypi/pyversions/asa-api-client.svg)](https://pypi.org/project/asa-api-client/)
 [![License](https://img.shields.io/github/license/SamPetherbridge/search-ads-api.svg)](https://github.com/SamPetherbridge/search-ads-api/blob/main/LICENSE)
 [![CI](https://github.com/SamPetherbridge/search-ads-api/actions/workflows/ci.yml/badge.svg)](https://github.com/SamPetherbridge/search-ads-api/actions/workflows/ci.yml)
 
@@ -21,27 +21,27 @@ A modern, fully-typed Python client for the Apple Search Ads API with async supp
 Using [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
-uv add search-ads-api
+uv add asa-api-client
 ```
 
 Using pip:
 
 ```bash
-pip install search-ads-api
+pip install asa-api-client
 ```
 
 With pandas support:
 
 ```bash
-uv add "search-ads-api[pandas]"
+uv add "asa-api-client[pandas]"
 # or
-pip install "search-ads-api[pandas]"
+pip install "asa-api-client[pandas]"
 ```
 
 ## Quick Start
 
 ```python
-from search_ads_api import AppleSearchAdsClient
+from asa_api_client import AppleSearchAdsClient
 
 # From environment variables
 client = AppleSearchAdsClient.from_env()
@@ -94,13 +94,13 @@ campaigns = client.campaigns.list()
 campaign = client.campaigns.get(campaign_id)
 
 # Find with filters
-from search_ads_api.models import Selector
+from asa_api_client.models import Selector
 enabled = client.campaigns.find(
     Selector().where("status", "==", "ENABLED")
 )
 
 # Create a campaign
-from search_ads_api.models import CampaignCreate, Money, CampaignSupplySource
+from asa_api_client.models import CampaignCreate, Money, CampaignSupplySource
 campaign = client.campaigns.create(
     CampaignCreate(
         name="My Campaign",
@@ -119,7 +119,7 @@ campaign = client.campaigns.create(
 ad_groups = client.campaigns(campaign_id).ad_groups.list()
 
 # Create an ad group
-from search_ads_api.models import AdGroupCreate
+from asa_api_client.models import AdGroupCreate
 ad_group = client.campaigns(campaign_id).ad_groups.create(
     AdGroupCreate(
         name="My Ad Group",
@@ -135,7 +135,7 @@ ad_group = client.campaigns(campaign_id).ad_groups.create(
 keywords = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.list()
 
 # Create keywords (bulk only)
-from search_ads_api.models import KeywordCreate, KeywordMatchType
+from asa_api_client.models import KeywordCreate, KeywordMatchType
 result = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.create_bulk([
     KeywordCreate(
         text="my keyword",

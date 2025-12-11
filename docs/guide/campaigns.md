@@ -17,7 +17,7 @@ campaign = client.campaigns.get(campaign_id)
 Use selectors for filtering:
 
 ```python
-from search_ads_api.models import Selector
+from asa_api_client.models import Selector
 
 # By status
 enabled = client.campaigns.find(
@@ -33,7 +33,7 @@ us_campaigns = client.campaigns.find(
 ## Create a Campaign
 
 ```python
-from search_ads_api.models import (
+from asa_api_client.models import (
     CampaignCreate,
     Money,
     CampaignSupplySource,
@@ -53,7 +53,7 @@ campaign = client.campaigns.create(
 ## Update a Campaign
 
 ```python
-from search_ads_api.models import CampaignUpdate
+from asa_api_client.models import CampaignUpdate
 
 client.campaigns.update(
     campaign_id,

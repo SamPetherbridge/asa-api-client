@@ -5,12 +5,12 @@ Provides methods for managing ad groups within campaigns.
 
 from typing import TYPE_CHECKING
 
-from search_ads_api.models.ad_groups import AdGroup, AdGroupCreate, AdGroupUpdate
-from search_ads_api.resources.base import WritableResource
+from asa_api_client.models.ad_groups import AdGroup, AdGroupCreate, AdGroupUpdate
+from asa_api_client.resources.base import WritableResource
 
 if TYPE_CHECKING:
-    from search_ads_api.client import AppleSearchAdsClient
-    from search_ads_api.resources.keywords import KeywordResource, NegativeKeywordResource
+    from asa_api_client.client import AppleSearchAdsClient
+    from asa_api_client.resources.keywords import KeywordResource, NegativeKeywordResource
 
 
 class AdGroupResource(WritableResource[AdGroup, AdGroupCreate, AdGroupUpdate]):
@@ -28,7 +28,7 @@ class AdGroupResource(WritableResource[AdGroup, AdGroupCreate, AdGroupUpdate]):
 
         Create a new ad group::
 
-            from search_ads_api.models import AdGroupCreate, Money
+            from asa_api_client.models import AdGroupCreate, Money
 
             ad_group = client.campaigns(123).ad_groups.create(
                 AdGroupCreate(
@@ -107,7 +107,7 @@ class AdGroupContext:
         self.ad_group_id = ad_group_id
 
         # Import here to avoid circular imports
-        from search_ads_api.resources.keywords import KeywordResource, NegativeKeywordResource
+        from asa_api_client.resources.keywords import KeywordResource, NegativeKeywordResource
 
         self._keywords = KeywordResource(client, campaign_id, ad_group_id)
         self._negative_keywords = NegativeKeywordResource(
@@ -140,7 +140,7 @@ class AdGroupContext:
         Example:
             Add negative keyword::
 
-                from search_ads_api.models import NegativeKeywordCreate, KeywordMatchType
+                from asa_api_client.models import NegativeKeywordCreate, KeywordMatchType
 
                 client.campaigns(123).ad_groups(456).negative_keywords.create(
                     NegativeKeywordCreate(
