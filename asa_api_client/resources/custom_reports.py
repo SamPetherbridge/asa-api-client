@@ -247,7 +247,6 @@ class CustomReportResource:
         granularity: GranularityType = GranularityType.DAILY,
         date_range: ImpressionShareDateRange | None = None,
         country_codes: builtins.list[str] | None = None,
-        return_records_with_no_metrics: bool = True,
     ) -> ImpressionShareReport:
         """Create a new impression share report.
 
@@ -261,7 +260,6 @@ class CustomReportResource:
             granularity: DAILY or WEEKLY (WEEKLY requires date_range).
             date_range: Required for WEEKLY granularity (LAST_WEEK, LAST_2_WEEKS, LAST_4_WEEKS).
             country_codes: Optional list of country codes to filter by.
-            return_records_with_no_metrics: Include keywords with no impressions.
 
         Returns:
             The created report (check state for completion status).
@@ -279,9 +277,6 @@ class CustomReportResource:
             "startTime": start_date.isoformat(),
             "endTime": end_date.isoformat(),
             "granularity": granularity.value,
-            "returnRecordsWithNoMetrics": return_records_with_no_metrics,
-            "returnRowTotals": False,
-            "returnGrandTotals": False,
         }
 
         if date_range:
@@ -311,7 +306,6 @@ class CustomReportResource:
         granularity: GranularityType = GranularityType.DAILY,
         date_range: ImpressionShareDateRange | None = None,
         country_codes: builtins.list[str] | None = None,
-        return_records_with_no_metrics: bool = True,
     ) -> ImpressionShareReport:
         """Create a new impression share report asynchronously.
 
@@ -322,7 +316,6 @@ class CustomReportResource:
             granularity: DAILY or WEEKLY.
             date_range: Required for WEEKLY granularity.
             country_codes: Optional list of country codes to filter by.
-            return_records_with_no_metrics: Include keywords with no impressions.
 
         Returns:
             The created report.
@@ -332,9 +325,6 @@ class CustomReportResource:
             "startTime": start_date.isoformat(),
             "endTime": end_date.isoformat(),
             "granularity": granularity.value,
-            "returnRecordsWithNoMetrics": return_records_with_no_metrics,
-            "returnRowTotals": False,
-            "returnGrandTotals": False,
         }
 
         if date_range:
@@ -446,7 +436,6 @@ class CustomReportResource:
         granularity: GranularityType = GranularityType.DAILY,
         date_range: ImpressionShareDateRange | None = None,
         country_codes: builtins.list[str] | None = None,
-        return_records_with_no_metrics: bool = True,
         poll_interval: float = 2.0,
         timeout: float = 300.0,
     ) -> ImpressionShareReport:
@@ -462,7 +451,6 @@ class CustomReportResource:
             granularity: DAILY or WEEKLY.
             date_range: Required for WEEKLY granularity.
             country_codes: Optional list of country codes to filter by.
-            return_records_with_no_metrics: Include keywords with no impressions.
             poll_interval: Seconds between status checks.
             timeout: Maximum seconds to wait.
 
@@ -491,7 +479,6 @@ class CustomReportResource:
             granularity=granularity,
             date_range=date_range,
             country_codes=country_codes,
-            return_records_with_no_metrics=return_records_with_no_metrics,
         )
 
         return self.wait_for_report(
@@ -509,7 +496,6 @@ class CustomReportResource:
         granularity: GranularityType = GranularityType.DAILY,
         date_range: ImpressionShareDateRange | None = None,
         country_codes: builtins.list[str] | None = None,
-        return_records_with_no_metrics: bool = True,
         poll_interval: float = 2.0,
         timeout: float = 300.0,
     ) -> ImpressionShareReport:
@@ -522,7 +508,6 @@ class CustomReportResource:
             granularity: DAILY or WEEKLY.
             date_range: Required for WEEKLY granularity.
             country_codes: Optional list of country codes to filter by.
-            return_records_with_no_metrics: Include keywords with no impressions.
             poll_interval: Seconds between status checks.
             timeout: Maximum seconds to wait.
 
@@ -536,7 +521,6 @@ class CustomReportResource:
             granularity=granularity,
             date_range=date_range,
             country_codes=country_codes,
-            return_records_with_no_metrics=return_records_with_no_metrics,
         )
 
         return await self.wait_for_report_async(
