@@ -1,4 +1,4 @@
-# Search Ads API
+# ASA API Client
 
 A modern, fully-typed Python client for the Apple Search Ads API with async support and Pydantic models.
 
@@ -38,7 +38,7 @@ with client:
 
 ## CLI Tool
 
-For a command-line interface, see [search-ads-cli](https://github.com/SamPetherbridge/search-ads-cli).
+For a command-line interface, see [asa-api-cli](https://github.com/SamPetherbridge/asa-api-cli).
 
 ## License
 

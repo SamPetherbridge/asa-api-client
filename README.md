@@ -180,12 +180,12 @@ asyncio.run(main())
 
 ## CLI
 
-For a command-line interface, install [search-ads-cli](https://github.com/SamPetherbridge/search-ads-cli):
+For a command-line interface, install [asa-api-cli](https://github.com/SamPetherbridge/asa-api-cli):
 
 ```bash
-uv add search-ads-cli
+uv tool install asa-api-cli
 # or
-pip install search-ads-cli
+pip install asa-api-cli
 ```
 
 ## License
