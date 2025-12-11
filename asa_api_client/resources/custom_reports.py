@@ -7,6 +7,7 @@ import asyncio
 import builtins
 import csv
 import io
+import sys
 import time
 from datetime import date
 from typing import TYPE_CHECKING, Any
@@ -196,13 +197,13 @@ class CustomReportResource:
             # Check if we should retry based on status code
             if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
                 delay = self._calculate_retry_delay(attempt, response)
-                logger.warning(
-                    "Received %d (attempt %d/%d), retrying in %.1fs",
-                    response.status_code,
-                    attempt + 1,
-                    max_retries + 1,
-                    delay,
+                # Log to both logger and stderr for visibility
+                msg = (
+                    f"Rate limited ({response.status_code}), "
+                    f"attempt {attempt + 1}/{max_retries + 1}, retrying in {delay:.0f}s..."
                 )
+                logger.warning(msg)
+                print(f"⏳ {msg}", file=sys.stderr)
                 time.sleep(delay)
                 continue
 
@@ -261,13 +262,12 @@ class CustomReportResource:
             # Check if we should retry based on status code
             if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
                 delay = self._calculate_retry_delay(attempt, response)
-                logger.warning(
-                    "Received %d (attempt %d/%d), retrying in %.1fs",
-                    response.status_code,
-                    attempt + 1,
-                    max_retries + 1,
-                    delay,
+                msg = (
+                    f"Rate limited ({response.status_code}), "
+                    f"attempt {attempt + 1}/{max_retries + 1}, retrying in {delay:.0f}s..."
                 )
+                logger.warning(msg)
+                print(f"⏳ {msg}", file=sys.stderr)
                 await asyncio.sleep(delay)
                 continue
 

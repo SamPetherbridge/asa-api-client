@@ -35,9 +35,9 @@ CreateT = TypeVar("CreateT", bound=BaseModel)
 UpdateT = TypeVar("UpdateT", bound=BaseModel)
 
 # Retry configuration
-DEFAULT_MAX_RETRIES = 3
-DEFAULT_INITIAL_DELAY = 1.0  # seconds
-DEFAULT_MAX_DELAY = 60.0  # seconds
+DEFAULT_MAX_RETRIES = 5
+DEFAULT_INITIAL_DELAY = 5.0  # seconds - Apple rate limits often need longer waits
+DEFAULT_MAX_DELAY = 120.0  # seconds
 DEFAULT_BACKOFF_FACTOR = 2.0
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
