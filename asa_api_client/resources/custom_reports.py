@@ -4,6 +4,8 @@ Provides methods for creating and retrieving impression share reports.
 """
 
 import builtins
+import csv
+import io
 import time
 from datetime import date
 from typing import TYPE_CHECKING, Any
@@ -16,6 +18,7 @@ from asa_api_client.models.reports import (
     GranularityType,
     ImpressionShareDateRange,
     ImpressionShareReport,
+    ImpressionShareReportRow,
 )
 
 if TYPE_CHECKING:
@@ -345,21 +348,100 @@ class CustomReportResource:
         report_data = data.get("data", data)
         return ImpressionShareReport.model_validate(report_data)
 
+    def _download_csv(self, download_uri: str) -> builtins.list[ImpressionShareReportRow]:
+        """Download and parse CSV data from the report.
+
+        Args:
+            download_uri: The URL to download the CSV from.
+
+        Returns:
+            List of parsed report rows.
+        """
+        try:
+            response = self._http_client.get(download_uri)
+            response.raise_for_status()
+        except httpx.RequestError as e:
+            raise NetworkError(f"Failed to download report CSV: {e}") from e
+
+        rows: builtins.list[ImpressionShareReportRow] = []
+        reader = csv.DictReader(io.StringIO(response.text))
+
+        for row_data in reader:
+            # Parse the CSV row into our model
+            parsed = ImpressionShareReportRow(
+                date=row_data.get("date"),
+                app_name=row_data.get("appName"),
+                adam_id=row_data.get("adamId"),
+                country_or_region=row_data.get("countryOrRegion"),
+                search_term=row_data.get("searchTerm"),
+                low_impression_share=float(row_data["lowImpressionShare"])
+                if row_data.get("lowImpressionShare")
+                else None,
+                high_impression_share=float(row_data["highImpressionShare"])
+                if row_data.get("highImpressionShare")
+                else None,
+                rank=row_data.get("rank"),
+                search_popularity=int(row_data["searchPopularity"])
+                if row_data.get("searchPopularity")
+                else None,
+            )
+            rows.append(parsed)
+
+        return rows
+
+    async def _download_csv_async(
+        self, download_uri: str
+    ) -> builtins.list[ImpressionShareReportRow]:
+        """Download and parse CSV data from the report asynchronously."""
+        try:
+            response = await self._async_http_client.get(download_uri)
+            response.raise_for_status()
+        except httpx.RequestError as e:
+            raise NetworkError(f"Failed to download report CSV: {e}") from e
+
+        rows: builtins.list[ImpressionShareReportRow] = []
+        reader = csv.DictReader(io.StringIO(response.text))
+
+        for row_data in reader:
+            parsed = ImpressionShareReportRow(
+                date=row_data.get("date"),
+                app_name=row_data.get("appName"),
+                adam_id=row_data.get("adamId"),
+                country_or_region=row_data.get("countryOrRegion"),
+                search_term=row_data.get("searchTerm"),
+                low_impression_share=float(row_data["lowImpressionShare"])
+                if row_data.get("lowImpressionShare")
+                else None,
+                high_impression_share=float(row_data["highImpressionShare"])
+                if row_data.get("highImpressionShare")
+                else None,
+                rank=row_data.get("rank"),
+                search_popularity=int(row_data["searchPopularity"])
+                if row_data.get("searchPopularity")
+                else None,
+            )
+            rows.append(parsed)
+
+        return rows
+
     def wait_for_report(
         self,
         report_id: int,
         *,
         poll_interval: float = 2.0,
         timeout: float = 300.0,
+        download_data: bool = True,
     ) -> ImpressionShareReport:
-        """Wait for a report to complete.
+        """Wait for a report to complete and optionally download data.
 
         Polls the report status until it's COMPLETED or FAILED.
+        When complete, downloads and parses the CSV data.
 
         Args:
             report_id: The report ID to wait for.
             poll_interval: Seconds between status checks.
             timeout: Maximum seconds to wait.
+            download_data: Whether to download and parse CSV data.
 
         Returns:
             The completed report with data.
@@ -374,6 +456,8 @@ class CustomReportResource:
             report = self.get(report_id)
 
             if report.is_complete:
+                if download_data and report.download_uri:
+                    report.row = self._download_csv(report.download_uri)
                 return report
 
             if report.is_failed:
@@ -392,6 +476,7 @@ class CustomReportResource:
         *,
         poll_interval: float = 2.0,
         timeout: float = 300.0,
+        download_data: bool = True,
     ) -> ImpressionShareReport:
         """Wait for a report to complete asynchronously.
 
@@ -399,6 +484,7 @@ class CustomReportResource:
             report_id: The report ID to wait for.
             poll_interval: Seconds between status checks.
             timeout: Maximum seconds to wait.
+            download_data: Whether to download and parse CSV data.
 
         Returns:
             The completed report with data.
@@ -415,6 +501,8 @@ class CustomReportResource:
             report = await self.get_async(report_id)
 
             if report.is_complete:
+                if download_data and report.download_uri:
+                    report.row = await self._download_csv_async(report.download_uri)
                 return report
 
             if report.is_failed:

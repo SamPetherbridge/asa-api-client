@@ -337,32 +337,43 @@ class SearchTermReportRow(BaseModel):
 
 
 class ImpressionShareReportRow(BaseModel):
-    """A row in an impression share report.
+    """A row in an impression share report (from CSV download).
 
     Impression share shows how often your ads appeared compared
-    to the total available impressions. Values are percentage ranges.
+    to the total available impressions. Values are percentage ranges (0.0-1.0).
 
     Attributes:
-        metadata: Information about the entity (keyword, ad group, campaign).
-        impression_share: Your share of impressions as a percentage range.
-        low_impression_share: Low end of impression share range.
-        high_impression_share: High end of impression share range.
-        rank: Your rank compared to competitors.
-        low_rank: Low end of rank range.
-        high_rank: High end of rank range.
-        search_popularity: Popularity of the search term (0-5 scale).
+        date: The date for this data point.
+        app_name: The app name.
+        adam_id: The app's adam ID.
+        country_or_region: The country/region code.
+        search_term: The search term that triggered impressions.
+        low_impression_share: Low end of impression share range (0.0-1.0).
+        high_impression_share: High end of impression share range (0.0-1.0).
+        rank: Your rank (ONE, TWO, THREE, FOUR, or GREATER_THAN_FOUR).
+        search_popularity: Popularity of the search term (1-5 scale).
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    metadata: ReportMetadata
-    impression_share: float | None = Field(default=None, alias="impressionShare")
+    date: str | None = None
+    app_name: str | None = Field(default=None, alias="appName")
+    adam_id: str | None = Field(default=None, alias="adamId")
+    country_or_region: str | None = Field(default=None, alias="countryOrRegion")
+    search_term: str | None = Field(default=None, alias="searchTerm")
     low_impression_share: float | None = Field(default=None, alias="lowImpressionShare")
     high_impression_share: float | None = Field(default=None, alias="highImpressionShare")
-    rank: int | None = None
-    low_rank: int | None = Field(default=None, alias="lowRank")
-    high_rank: int | None = Field(default=None, alias="highRank")
+    rank: str | None = None  # ONE, TWO, THREE, FOUR, GREATER_THAN_FOUR
     search_popularity: int | None = Field(default=None, alias="searchPopularity")
+
+    @property
+    def share_range_pct(self) -> str:
+        """Format impression share as percentage range string."""
+        if self.low_impression_share is None and self.high_impression_share is None:
+            return "N/A"
+        low = f"{int(self.low_impression_share * 100)}" if self.low_impression_share else "0"
+        high = f"{int(self.high_impression_share * 100)}" if self.high_impression_share else "?"
+        return f"{low}-{high}%"
 
 
 class ImpressionShareDateRange(StrEnum):
@@ -413,7 +424,11 @@ class ImpressionShareReportRequest(BaseModel):
 
 
 class ImpressionShareReport(BaseModel):
-    """An impression share report with metadata and rows.
+    """An impression share report with metadata and download URL.
+
+    Note: Impression share data is not returned inline. Once the report
+    is complete, use `download_uri` to fetch the CSV data, or use the
+    `get_impression_share()` convenience method which auto-downloads.
 
     Attributes:
         id: The report ID.
@@ -422,7 +437,8 @@ class ImpressionShareReport(BaseModel):
         start_time: Report start date.
         end_time: Report end date.
         granularity: Time granularity (DAILY or WEEKLY).
-        row: List of report rows with impression share data.
+        download_uri: URL to download the CSV data (available when complete).
+        row: Parsed report rows (populated after downloading CSV).
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
@@ -434,6 +450,7 @@ class ImpressionShareReport(BaseModel):
     end_time: str | None = Field(default=None, alias="endTime")
     granularity: GranularityType | str | None = None
     date_range: str | None = Field(default=None, alias="dateRange")
+    download_uri: str | None = Field(default=None, alias="downloadUri")
     row: list[ImpressionShareReportRow] = Field(default_factory=list)
     grand_totals: GrandTotals | None = Field(default=None, alias="grandTotals")
 
@@ -467,25 +484,17 @@ class ImpressionShareReport(BaseModel):
         rows_data: list[dict[str, Any]] = []
 
         for row in self.row:
-            row_data: dict[str, Any] = {}
-
-            if row.metadata:
-                meta_dict = row.metadata.model_dump(by_alias=False, exclude_none=True)
-                if meta_dict.get("bid_amount"):
-                    row_data["bid"] = meta_dict["bid_amount"].get("amount")
-                    row_data["currency"] = meta_dict["bid_amount"].get("currency")
-                    del meta_dict["bid_amount"]
-                row_data.update(meta_dict)
-
-            # Add impression share fields
-            row_data["impression_share"] = row.impression_share
-            row_data["low_impression_share"] = row.low_impression_share
-            row_data["high_impression_share"] = row.high_impression_share
-            row_data["rank"] = row.rank
-            row_data["low_rank"] = row.low_rank
-            row_data["high_rank"] = row.high_rank
-            row_data["search_popularity"] = row.search_popularity
-
+            row_data: dict[str, Any] = {
+                "date": row.date,
+                "app_name": row.app_name,
+                "adam_id": row.adam_id,
+                "country_or_region": row.country_or_region,
+                "search_term": row.search_term,
+                "low_impression_share": row.low_impression_share,
+                "high_impression_share": row.high_impression_share,
+                "rank": row.rank,
+                "search_popularity": row.search_popularity,
+            }
             rows_data.append(row_data)
 
         return pd.DataFrame(rows_data)
