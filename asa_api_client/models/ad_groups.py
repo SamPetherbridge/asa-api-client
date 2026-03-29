@@ -30,14 +30,20 @@ class AdGroupServingStatus(StrEnum):
 class AdGroupServingStateReason(StrEnum):
     """Reasons why an ad group may not be serving."""
 
-    PAUSED_BY_USER = "PAUSED_BY_USER"
-    DELETED_BY_USER = "DELETED_BY_USER"
+    AD_GROUP_PAUSED_BY_USER = "AD_GROUP_PAUSED_BY_USER"
+    ADGROUP_END_DATE_REACHED = "ADGROUP_END_DATE_REACHED"
+    APP_NOT_SUPPORT = "APP_NOT_SUPPORT"
+    AUDIENCE_BELOW_THRESHOLD = "AUDIENCE_BELOW_THRESHOLD"
+    CAMPAIGN_END_DATE_REACHED = "CAMPAIGN_END_DATE_REACHED"
     CAMPAIGN_NOT_RUNNING = "CAMPAIGN_NOT_RUNNING"
-    AD_GROUP_END_DATE_REACHED = "AD_GROUP_END_DATE_REACHED"
-    AD_GROUP_START_DATE_IN_FUTURE = "AD_GROUP_START_DATE_IN_FUTURE"
-    NO_ELIGIBLE_ADS = "NO_ELIGIBLE_ADS"
-    NO_ELIGIBLE_KEYWORDS = "NO_ELIGIBLE_KEYWORDS"
-    TARGETING_INVALID = "TARGETING_INVALID"
+    CAMPAIGN_START_DATE_IN_FUTURE = "CAMPAIGN_START_DATE_IN_FUTURE"
+    DELETED_BY_USER = "DELETED_BY_USER"
+    NO_AVAILABLE_ADS = "NO_AVAILABLE_ADS"
+    PENDING_AUDIENCE_VERIFICATION = "PENDING_AUDIENCE_VERIFICATION"
+    START_DATE_IN_THE_FUTURE = "START_DATE_IN_THE_FUTURE"
+    TARGETED_DEVICE_CLASS_NOT_SUPPORTED_SUPPLY_SOURCE = (
+        "TARGETED_DEVICE_CLASS_NOT_SUPPORTED_SUPPLY_SOURCE"
+    )
 
 
 class AdGroupDisplayStatus(StrEnum):
@@ -157,6 +163,7 @@ class TargetingDimensions(BaseModel):
     locality: TargetingDimensionValue | None = None
     app_downloaders: TargetingDimensionValue | None = Field(default=None, alias="appDownloaders")
     app_categories: TargetingDimensionValue | None = Field(default=None, alias="appCategories")
+    country: TargetingDimensionValue | None = None
 
 
 class CpaGoal(BaseModel):
@@ -221,6 +228,12 @@ class AdGroup(BaseModel):
     start_time: datetime | None = Field(default=None, alias="startTime")
     end_time: datetime | None = Field(default=None, alias="endTime")
     pricing_model: PricingModel | str | None = Field(default=None, alias="pricingModel")
+    deleted: bool = False
+    automated_keywords_required: bool | None = Field(
+        default=None, alias="automatedKeywordsRequired"
+    )
+    bidding_strategy: str | None = Field(default=None, alias="biddingStrategy")
+    payment_model: str | None = Field(default=None, alias="paymentModel")
 
 
 class AdGroupCreate(BaseModel):

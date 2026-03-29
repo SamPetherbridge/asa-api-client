@@ -5,6 +5,7 @@ Apple Search Ads API. All models are Pydantic BaseModels with full
 type hints and validation.
 """
 
+from asa_api_client.models.acls import UserAcl
 from asa_api_client.models.ad_groups import (
     AdGroup,
     AdGroupCreate,
@@ -17,6 +18,17 @@ from asa_api_client.models.ad_groups import (
     CpaGoal,
     TargetingDimensions,
 )
+from asa_api_client.models.ads import (
+    Ad,
+    AdCreate,
+    AdDisplayStatus,
+    AdServingStateReason,
+    AdServingStatus,
+    AdStatus,
+    AdUpdate,
+    CreativeType,
+)
+from asa_api_client.models.apps import AppInfo
 from asa_api_client.models.base import (
     Condition,
     ConditionOperator,
@@ -28,8 +40,11 @@ from asa_api_client.models.base import (
     Sorting,
     SortOrder,
 )
+from asa_api_client.models.budget_orders import BudgetOrder, BudgetOrderStatus
 from asa_api_client.models.campaigns import (
     AdChannelType,
+    BiddingStrategy,
+    BidStrategyType,
     BillingEvent,
     Campaign,
     CampaignCountryOrRegionServingStateReason,
@@ -41,6 +56,8 @@ from asa_api_client.models.campaigns import (
     CampaignSupplySource,
     CampaignUpdate,
 )
+from asa_api_client.models.countries import CountryOrRegion, LanguageDetail
+from asa_api_client.models.geo import GeoEntityType, GeoLocation
 from asa_api_client.models.keywords import (
     Keyword,
     KeywordCreate,
@@ -50,6 +67,7 @@ from asa_api_client.models.keywords import (
     NegativeKeyword,
     NegativeKeywordCreate,
 )
+from asa_api_client.models.product_pages import ProductPage, ProductPageLocaleDetail
 from asa_api_client.models.reports import (
     GranularityType,
     ImpressionShareDateRange,
@@ -57,6 +75,7 @@ from asa_api_client.models.reports import (
     ImpressionShareReportRequest,
     ImpressionShareReportRow,
     ImpressionShareReportStatus,
+    MetricData,
     ReportingRequest,
     ReportingResponse,
     ReportMetadata,
@@ -65,7 +84,10 @@ from asa_api_client.models.reports import (
 )
 
 __all__ = [
+    "Ad",
     "AdChannelType",
+    "AdCreate",
+    "AdDisplayStatus",
     "AdGroup",
     "AdGroupCreate",
     "AdGroupDisplayStatus",
@@ -73,8 +95,17 @@ __all__ = [
     "AdGroupServingStatus",
     "AdGroupStatus",
     "AdGroupUpdate",
+    "AdServingStateReason",
+    "AdServingStatus",
+    "AdStatus",
+    "AdUpdate",
+    "AppInfo",
     "AutomatedKeywordsOptInStatus",
+    "BidStrategyType",
+    "BiddingStrategy",
     "BillingEvent",
+    "BudgetOrder",
+    "BudgetOrderStatus",
     "Campaign",
     "CampaignCountryOrRegionServingStateReason",
     "CampaignCreate",
@@ -86,7 +117,11 @@ __all__ = [
     "CampaignUpdate",
     "Condition",
     "ConditionOperator",
+    "CountryOrRegion",
     "CpaGoal",
+    "CreativeType",
+    "GeoEntityType",
+    "GeoLocation",
     "GranularityType",
     "ImpressionShareDateRange",
     "ImpressionShareReport",
@@ -98,12 +133,16 @@ __all__ = [
     "KeywordMatchType",
     "KeywordStatus",
     "KeywordUpdate",
+    "LanguageDetail",
+    "MetricData",
     "Money",
     "NegativeKeyword",
     "NegativeKeywordCreate",
     "PageDetail",
     "PaginatedResponse",
     "Pagination",
+    "ProductPage",
+    "ProductPageLocaleDetail",
     "ReportMetadata",
     "ReportRow",
     "ReportingRequest",
@@ -113,4 +152,5 @@ __all__ = [
     "Sorting",
     "SpendRow",
     "TargetingDimensions",
+    "UserAcl",
 ]

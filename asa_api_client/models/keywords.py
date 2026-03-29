@@ -81,6 +81,7 @@ class Keyword(BaseModel):
     deleted: bool = False
     serving_status: KeywordServingStatus | str | None = Field(default=None, alias="servingStatus")
     display_status: KeywordDisplayStatus | str | None = Field(default=None, alias="displayStatus")
+    creation_time: datetime | None = Field(default=None, alias="creationTime")
 
 
 class KeywordCreate(BaseModel):

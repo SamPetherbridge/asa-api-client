@@ -156,6 +156,22 @@ class KeywordResource(WritableResource[Keyword, KeywordCreate, KeywordUpdate]):
         response = await self._request_async("PUT", "bulk", json=data)
         return self._parse_list_response(response)
 
+    def delete_bulk(self, keyword_ids: list[int]) -> None:
+        """Delete multiple keywords at once.
+
+        Args:
+            keyword_ids: List of keyword IDs to delete.
+        """
+        self._request("POST", "delete/bulk", json=keyword_ids)
+
+    async def delete_bulk_async(self, keyword_ids: list[int]) -> None:
+        """Delete multiple keywords at once asynchronously.
+
+        Args:
+            keyword_ids: List of keyword IDs to delete.
+        """
+        await self._request_async("POST", "delete/bulk", json=keyword_ids)
+
 
 class _NegativeKeywordUpdate(BaseModel):
     """Placeholder update model for negative keywords (updates not supported)."""
@@ -248,22 +264,83 @@ class NegativeKeywordResource(
         response = await self._request_async("POST", "bulk", json=data)
         return self._parse_list_response(response)
 
+    def update_bulk(
+        self, updates: list[tuple[int, NegativeKeywordCreate]]
+    ) -> PaginatedResponse[NegativeKeyword]:
+        """Update multiple negative keywords at once.
+
+        Args:
+            updates: List of (keyword_id, update_data) tuples.
+
+        Returns:
+            A paginated response containing the updated negative keywords.
+        """
+        data = []
+        for keyword_id, update in updates:
+            update_dict = update.model_dump(by_alias=True, exclude_none=True, mode="json")
+            update_dict["id"] = keyword_id
+            data.append(update_dict)
+
+        response = self._request("PUT", "bulk", json=data)
+        return self._parse_list_response(response)
+
+    async def update_bulk_async(
+        self, updates: list[tuple[int, NegativeKeywordCreate]]
+    ) -> PaginatedResponse[NegativeKeyword]:
+        """Update multiple negative keywords at once asynchronously.
+
+        Args:
+            updates: List of (keyword_id, update_data) tuples.
+
+        Returns:
+            A paginated response containing the updated negative keywords.
+        """
+        data = []
+        for keyword_id, update in updates:
+            update_dict = update.model_dump(by_alias=True, exclude_none=True, mode="json")
+            update_dict["id"] = keyword_id
+            data.append(update_dict)
+
+        response = await self._request_async("PUT", "bulk", json=data)
+        return self._parse_list_response(response)
+
+    def delete_bulk(self, keyword_ids: list[int]) -> None:
+        """Delete multiple negative keywords at once.
+
+        Args:
+            keyword_ids: List of keyword IDs to delete.
+        """
+        self._request("POST", "delete/bulk", json=keyword_ids)
+
+    async def delete_bulk_async(self, keyword_ids: list[int]) -> None:
+        """Delete multiple negative keywords at once asynchronously.
+
+        Args:
+            keyword_ids: List of keyword IDs to delete.
+        """
+        await self._request_async("POST", "delete/bulk", json=keyword_ids)
+
     def update(self, resource_id: int, data: _NegativeKeywordUpdate) -> NegativeKeyword:
-        """Update is not supported for negative keywords.
+        """Update is not supported for individual negative keywords.
+
+        Use update_bulk() instead.
 
         Raises:
-            NotImplementedError: Always, as negative keywords cannot be updated.
+            NotImplementedError: Always.
         """
         raise NotImplementedError(
-            "Negative keywords cannot be updated. Delete and recreate instead."
+            "Individual negative keyword updates are not supported. Use update_bulk() instead."
         )
 
     async def update_async(self, resource_id: int, data: _NegativeKeywordUpdate) -> NegativeKeyword:
-        """Update is not supported for negative keywords.
+        """Update is not supported for individual negative keywords.
+
+        Use update_bulk_async() instead.
 
         Raises:
-            NotImplementedError: Always, as negative keywords cannot be updated.
+            NotImplementedError: Always.
         """
         raise NotImplementedError(
-            "Negative keywords cannot be updated. Delete and recreate instead."
+            "Individual negative keyword updates are not supported. "
+            "Use update_bulk_async() instead."
         )

@@ -12,8 +12,14 @@ import httpx
 
 from asa_api_client.auth import Authenticator
 from asa_api_client.logging import get_logger
+from asa_api_client.resources.acls import ACLResource
+from asa_api_client.resources.apps import AppResource
+from asa_api_client.resources.budget_orders import BudgetOrderResource
 from asa_api_client.resources.campaigns import CampaignResource
+from asa_api_client.resources.countries import CountryOrRegionResource
 from asa_api_client.resources.custom_reports import CustomReportResource
+from asa_api_client.resources.geo import GeoResource
+from asa_api_client.resources.product_pages import ProductPageResource
 from asa_api_client.resources.reports import ReportResource
 
 logger = get_logger(__name__)
@@ -36,6 +42,10 @@ class AppleSearchAdsClient:
         campaigns: Resource for managing campaigns.
         reports: Resource for generating reports.
         custom_reports: Resource for impression share reports.
+        budget_orders: Resource for reading budget orders.
+        acls: Resource for reading access control lists.
+        apps: Resource for searching eligible apps.
+        geo: Resource for searching geographic locations.
 
     Example:
         Basic usage::
@@ -137,6 +147,11 @@ class AppleSearchAdsClient:
         self._campaigns = CampaignResource(self)
         self._reports = ReportResource(self)
         self._custom_reports = CustomReportResource(self)
+        self._budget_orders = BudgetOrderResource(self)
+        self._acls = ACLResource(self)
+        self._apps = AppResource(self)
+        self._geo = GeoResource(self)
+        self._countries_or_regions = CountryOrRegionResource(self)
 
         logger.info(
             "AppleSearchAdsClient initialized for org_id=%d, base_url=%s",
@@ -286,6 +301,89 @@ class AppleSearchAdsClient:
                     print(f"{row.metadata.keyword}: {share}")
         """
         return self._custom_reports
+
+    @property
+    def budget_orders(self) -> BudgetOrderResource:
+        """Get the budget orders resource.
+
+        Returns:
+            BudgetOrderResource for reading budget orders.
+        """
+        return self._budget_orders
+
+    @property
+    def acls(self) -> ACLResource:
+        """Get the ACLs resource.
+
+        Returns:
+            ACLResource for reading access control lists.
+
+        Example:
+            List accessible organizations::
+
+                acls = client.acls.list()
+                for acl in acls:
+                    print(f"{acl.org_name}: {acl.role_names}")
+        """
+        return self._acls
+
+    @property
+    def apps(self) -> AppResource:
+        """Get the apps resource.
+
+        Returns:
+            AppResource for searching eligible iOS apps.
+
+        Example:
+            Search for apps::
+
+                apps = client.apps.search(query="my app")
+        """
+        return self._apps
+
+    @property
+    def geo(self) -> GeoResource:
+        """Get the geo search resource.
+
+        Returns:
+            GeoResource for searching geographic locations.
+
+        Example:
+            Search for locations::
+
+                locations = client.geo.search(query="California", country_code="US")
+        """
+        return self._geo
+
+    @property
+    def countries_or_regions(self) -> CountryOrRegionResource:
+        """Get the countries/regions resource.
+
+        Returns:
+            CountryOrRegionResource for listing supported countries.
+
+        Example:
+            List supported countries::
+
+                countries = client.countries_or_regions.list()
+        """
+        return self._countries_or_regions
+
+    def product_pages(self, adam_id: int) -> ProductPageResource:
+        """Get the product pages resource for a specific app.
+
+        Args:
+            adam_id: The App Store app ID.
+
+        Returns:
+            ProductPageResource for retrieving product pages.
+
+        Example:
+            List product pages::
+
+                pages = client.product_pages(adam_id=123456789).list()
+        """
+        return ProductPageResource(self, adam_id)
 
     def close(self) -> None:
         """Close the HTTP clients and release resources.

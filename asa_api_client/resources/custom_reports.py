@@ -10,6 +10,7 @@ import io
 import os
 import sys
 import time
+import warnings
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
@@ -294,9 +295,21 @@ class CustomReportResource:
     def list_reports(self) -> "builtins.list[ImpressionShareReport]":
         """List all impression share reports.
 
+        .. deprecated::
+            The GET /custom-reports endpoint returns 403 since March 2026.
+            Apple replaced Custom Reports with the Insights analytics tool.
+            This method may fail. Use create_impression_share() + wait_for_report()
+            which still works via POST-based polling.
+
         Returns:
             List of impression share reports.
         """
+        warnings.warn(
+            "list_reports() is deprecated: the GET /custom-reports endpoint has been "
+            "disabled by Apple since March 2026. Use create_impression_share() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Apple's custom-reports endpoint doesn't support pagination params
         data = self._request("GET", "")
 
@@ -313,13 +326,9 @@ class CustomReportResource:
     ) -> ImpressionShareReport | None:
         """Find an existing completed report covering the requested date range.
 
-        Apple limits impression share reports to 10 per day. This method
-        helps avoid creating duplicate reports by finding existing ones.
-
-        A report is reusable if:
-        1. Exact match: covers the full requested range, OR
-        2. Close match: starts on/before our start AND ends within 1 day of our end
-           (useful when today just rolled over but data isn't available yet)
+        .. deprecated::
+            This method relies on list_reports() which uses the now-disabled
+            GET /custom-reports endpoint. It will return None on failure.
 
         Args:
             start_date: Report start date.
@@ -330,7 +339,9 @@ class CustomReportResource:
             Best matching report if found, None otherwise.
         """
         try:
-            reports = self.list_reports()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                reports = self.list_reports()
 
             # Find reports that cover our date range (with 1-day tolerance on end)
             candidates: builtins.list[tuple[ImpressionShareReport, int]] = []
@@ -383,9 +394,19 @@ class CustomReportResource:
     async def list_reports_async(self) -> "builtins.list[ImpressionShareReport]":
         """List all impression share reports asynchronously.
 
+        .. deprecated::
+            The GET /custom-reports endpoint returns 403 since March 2026.
+            Apple replaced Custom Reports with the Insights analytics tool.
+
         Returns:
             List of impression share reports.
         """
+        warnings.warn(
+            "list_reports_async() is deprecated: the GET /custom-reports endpoint has been "
+            "disabled by Apple since March 2026. Use create_impression_share_async() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # Apple's custom-reports endpoint doesn't support pagination params
         data = await self._request_async("GET", "")
 
@@ -397,12 +418,26 @@ class CustomReportResource:
     def get(self, report_id: int) -> ImpressionShareReport:
         """Get a specific impression share report by ID.
 
+        .. deprecated::
+            The GET /custom-reports endpoint returns 403 since March 2026.
+            Use create_impression_share() + wait_for_report() instead.
+
         Args:
             report_id: The report ID.
 
         Returns:
             The impression share report.
         """
+        warnings.warn(
+            "get() is deprecated: the GET /custom-reports endpoint has been "
+            "disabled by Apple since March 2026.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._get_report_status(report_id)
+
+    def _get_report_status(self, report_id: int) -> ImpressionShareReport:
+        """Internal method to get report status (no deprecation warning)."""
         data = self._request("GET", str(report_id))
         report_data = data.get("data", data)
         return ImpressionShareReport.model_validate(report_data)
@@ -410,12 +445,25 @@ class CustomReportResource:
     async def get_async(self, report_id: int) -> ImpressionShareReport:
         """Get a specific impression share report by ID asynchronously.
 
+        .. deprecated::
+            The GET /custom-reports endpoint returns 403 since March 2026.
+
         Args:
             report_id: The report ID.
 
         Returns:
             The impression share report.
         """
+        warnings.warn(
+            "get_async() is deprecated: the GET /custom-reports endpoint has been "
+            "disabled by Apple since March 2026.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return await self._get_report_status_async(report_id)
+
+    async def _get_report_status_async(self, report_id: int) -> ImpressionShareReport:
+        """Internal async method to get report status (no deprecation warning)."""
         data = await self._request_async("GET", str(report_id))
         report_data = data.get("data", data)
         return ImpressionShareReport.model_validate(report_data)
@@ -632,7 +680,7 @@ class CustomReportResource:
         start_time = time.time()
 
         while True:
-            report = self.get(report_id)
+            report = self._get_report_status(report_id)
 
             if report.is_complete:
                 if download_data and report.download_uri:
@@ -677,7 +725,7 @@ class CustomReportResource:
         start_time = time.time()
 
         while True:
-            report = await self.get_async(report_id)
+            report = await self._get_report_status_async(report_id)
 
             if report.is_complete:
                 if download_data and report.download_uri:
@@ -705,16 +753,17 @@ class CustomReportResource:
         country_codes: builtins.list[str] | None = None,
         poll_interval: float = 2.0,
         timeout: float = 300.0,
-        reuse_existing: bool = True,
+        reuse_existing: bool = False,
     ) -> ImpressionShareReport:
         """Create an impression share report and wait for results.
 
         This is a convenience method that creates a report and polls
         until it's complete.
 
-        NOTE: Apple limits impression share reports to 10 per day. By default,
-        this method will check for an existing report with matching date range
-        and reuse it to conserve your daily quota.
+        NOTE: Apple limits impression share reports to 10 per day. The
+        reuse_existing option is disabled by default because Apple disabled
+        the GET /custom-reports endpoint in March 2026. Set reuse_existing=True
+        to attempt reuse (will silently skip if the GET endpoint fails).
 
         Args:
             start_date: Report start date (max 12 weeks ago).

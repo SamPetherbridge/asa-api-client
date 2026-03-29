@@ -502,3 +502,227 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
             "POST", f"campaigns/{campaign_id}/searchterms", json=request
         )
         return self._parse_report_response(data)
+
+    def ad_group_keywords(
+        self,
+        campaign_id: int,
+        ad_group_id: int,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType = GranularityType.DAILY,
+        group_by: list[str] | None = None,
+        timezone: str = "UTC",
+    ) -> ReportingResponse:
+        """Get a keyword report scoped to a specific ad group.
+
+        Args:
+            campaign_id: The campaign ID.
+            ad_group_id: The ad group ID.
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity.
+            group_by: Optional fields to group by.
+            timezone: Timezone for the report.
+
+        Returns:
+            The keyword report for the specified ad group.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            group_by=group_by,
+            timezone=timezone,
+        )
+
+        data = self._request(
+            "POST",
+            f"campaigns/{campaign_id}/adgroups/{ad_group_id}/keywords",
+            json=request,
+        )
+        return self._parse_report_response(data)
+
+    async def ad_group_keywords_async(
+        self,
+        campaign_id: int,
+        ad_group_id: int,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType = GranularityType.DAILY,
+        group_by: list[str] | None = None,
+        timezone: str = "UTC",
+    ) -> ReportingResponse:
+        """Get a keyword report scoped to a specific ad group asynchronously.
+
+        Args:
+            campaign_id: The campaign ID.
+            ad_group_id: The ad group ID.
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity.
+            group_by: Optional fields to group by.
+            timezone: Timezone for the report.
+
+        Returns:
+            The keyword report for the specified ad group.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            group_by=group_by,
+            timezone=timezone,
+        )
+
+        data = await self._request_async(
+            "POST",
+            f"campaigns/{campaign_id}/adgroups/{ad_group_id}/keywords",
+            json=request,
+        )
+        return self._parse_report_response(data)
+
+    def ad_group_search_terms(
+        self,
+        campaign_id: int,
+        ad_group_id: int,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType = GranularityType.DAILY,
+        timezone: str = "UTC",
+    ) -> ReportingResponse:
+        """Get a search term report scoped to a specific ad group.
+
+        Args:
+            campaign_id: The campaign ID.
+            ad_group_id: The ad group ID.
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity.
+            timezone: Timezone for the report.
+
+        Returns:
+            The search term report for the specified ad group.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            timezone=timezone,
+        )
+
+        data = self._request(
+            "POST",
+            f"campaigns/{campaign_id}/adgroups/{ad_group_id}/searchterms",
+            json=request,
+        )
+        return self._parse_report_response(data)
+
+    async def ad_group_search_terms_async(
+        self,
+        campaign_id: int,
+        ad_group_id: int,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType = GranularityType.DAILY,
+        timezone: str = "UTC",
+    ) -> ReportingResponse:
+        """Get a search term report scoped to a specific ad group asynchronously.
+
+        Args:
+            campaign_id: The campaign ID.
+            ad_group_id: The ad group ID.
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity.
+            timezone: Timezone for the report.
+
+        Returns:
+            The search term report for the specified ad group.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            timezone=timezone,
+        )
+
+        data = await self._request_async(
+            "POST",
+            f"campaigns/{campaign_id}/adgroups/{ad_group_id}/searchterms",
+            json=request,
+        )
+        return self._parse_report_response(data)
+
+    def ads(
+        self,
+        campaign_id: int,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType = GranularityType.DAILY,
+        group_by: list[str] | None = None,
+        timezone: str = "UTC",
+    ) -> ReportingResponse:
+        """Get an ad-level performance report.
+
+        Args:
+            campaign_id: The campaign ID to report on.
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity.
+            group_by: Optional fields to group by.
+            timezone: Timezone for the report.
+
+        Returns:
+            The ad-level report with performance metrics.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            group_by=group_by,
+            timezone=timezone,
+        )
+
+        data = self._request("POST", f"campaigns/{campaign_id}/ads", json=request)
+        return self._parse_report_response(data)
+
+    async def ads_async(
+        self,
+        campaign_id: int,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType = GranularityType.DAILY,
+        group_by: list[str] | None = None,
+        timezone: str = "UTC",
+    ) -> ReportingResponse:
+        """Get an ad-level performance report asynchronously.
+
+        Args:
+            campaign_id: The campaign ID to report on.
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity.
+            group_by: Optional fields to group by.
+            timezone: Timezone for the report.
+
+        Returns:
+            The ad-level report with performance metrics.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            group_by=group_by,
+            timezone=timezone,
+        )
+
+        data = await self._request_async(
+            "POST", f"campaigns/{campaign_id}/ads", json=request
+        )
+        return self._parse_report_response(data)

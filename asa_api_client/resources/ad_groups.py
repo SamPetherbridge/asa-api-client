@@ -10,6 +10,7 @@ from asa_api_client.resources.base import WritableResource
 
 if TYPE_CHECKING:
     from asa_api_client.client import AppleSearchAdsClient
+    from asa_api_client.resources.ads import AdResource
     from asa_api_client.resources.keywords import KeywordResource, NegativeKeywordResource
 
 
@@ -80,13 +81,14 @@ class AdGroupContext:
     """Context for accessing resources within a specific ad group.
 
     This class provides access to nested resources like keywords
-    that belong to a specific ad group.
+    and ads that belong to a specific ad group.
 
     Attributes:
         campaign_id: The parent campaign ID.
         ad_group_id: The ad group ID this context is for.
         keywords: Resource for managing targeting keywords.
         negative_keywords: Resource for ad group-level negative keywords.
+        ads: Resource for managing ads.
     """
 
     def __init__(
@@ -107,6 +109,7 @@ class AdGroupContext:
         self.ad_group_id = ad_group_id
 
         # Import here to avoid circular imports
+        from asa_api_client.resources.ads import AdResource
         from asa_api_client.resources.keywords import KeywordResource, NegativeKeywordResource
 
         self._keywords = KeywordResource(client, campaign_id, ad_group_id)
@@ -115,6 +118,7 @@ class AdGroupContext:
             campaign_id=campaign_id,
             ad_group_id=ad_group_id,
         )
+        self._ads = AdResource(client, campaign_id, ad_group_id)
 
     @property
     def keywords(self) -> "KeywordResource":
@@ -150,3 +154,17 @@ class AdGroupContext:
                 )
         """
         return self._negative_keywords
+
+    @property
+    def ads(self) -> "AdResource":
+        """Get the ads resource for this ad group.
+
+        Returns:
+            AdResource for managing ads in this ad group.
+
+        Example:
+            List ads::
+
+                ads = client.campaigns(123).ad_groups(456).ads.list()
+        """
+        return self._ads

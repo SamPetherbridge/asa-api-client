@@ -118,17 +118,39 @@ class MetricData(BaseModel):
 
     impressions: int = 0
     taps: int = 0
-    installs: int = 0
-    new_downloads: int = Field(default=0, alias="newDownloads")
-    redownloads: int = 0
-    lat_on_installs: int = Field(default=0, alias="latOnInstalls")
-    lat_off_installs: int = Field(default=0, alias="latOffInstalls")
     ttr: float | None = None  # Can be None when no impressions
-    avg_cpa: SpendRow | None = Field(default=None, alias="avgCPA")
+
+    # Tap-through metrics (installs from users who tapped the ad)
+    tap_installs: int = Field(default=0, alias="tapInstalls")
+    tap_new_downloads: int = Field(default=0, alias="tapNewDownloads")
+    tap_redownloads: int = Field(default=0, alias="tapRedownloads")
+    tap_install_cpi: SpendRow | None = Field(default=None, alias="tapInstallCPI")
+    tap_install_rate: float | None = Field(default=None, alias="tapInstallRate")
+
+    # View-through metrics (installs from users who saw but didn't tap the ad)
+    view_installs: int = Field(default=0, alias="viewInstalls")
+    view_new_downloads: int = Field(default=0, alias="viewNewDownloads")
+    view_redownloads: int = Field(default=0, alias="viewRedownloads")
+
+    # Total metrics (tap-through + view-through combined)
+    total_installs: int = Field(default=0, alias="totalInstalls")
+    total_new_downloads: int = Field(default=0, alias="totalNewDownloads")
+    total_redownloads: int = Field(default=0, alias="totalRedownloads")
+    total_install_rate: float | None = Field(default=None, alias="totalInstallRate")
+    total_avg_cpi: SpendRow | None = Field(default=None, alias="totalAvgCPI")
+
+    # Spend metrics
     avg_cpt: SpendRow | None = Field(default=None, alias="avgCPT")
+    avg_cpm: SpendRow | None = Field(default=None, alias="avgCPM")
     local_spend: SpendRow | None = Field(default=None, alias="localSpend")
-    # Can be None when no taps
-    conversion_rate: float | None = Field(default=None, alias="conversionRate")
+
+    # Pre-order metrics
+    tap_pre_orders_placed: int = Field(default=0, alias="tapPreOrdersPlaced")
+    view_pre_orders_placed: int = Field(default=0, alias="viewPreOrdersPlaced")
+    total_pre_orders_placed: int = Field(default=0, alias="totalPreOrdersPlaced")
+
+    # Date within granularity breakdowns
+    date: str | None = None
 
 
 class ReportMetadata(BaseModel):
@@ -166,8 +188,21 @@ class ReportMetadata(BaseModel):
     search_term_text: str | None = Field(default=None, alias="searchTermText")
     search_term_source: str | None = Field(default=None, alias="searchTermSource")
     bid_amount: SpendRow | None = Field(default=None, alias="bidAmount")
+    suggested_bid_amount: SpendRow | None = Field(default=None, alias="suggestedBidAmount")
     deleted: bool = False
     date: str | None = None
+
+    # Ad-level report metadata
+    ad_id: int | None = Field(default=None, alias="adId")
+    ad_name: str | None = Field(default=None, alias="adName")
+    ad_display_status: str | None = Field(default=None, alias="adDisplayStatus")
+    ad_serving_state_reasons: list[str] | None = Field(
+        default=None, alias="adServingStateReasons"
+    )
+    creative_type: str | None = Field(default=None, alias="creativeType")
+    creative_id: int | None = Field(default=None, alias="creativeId")
+    product_page_id: str | None = Field(default=None, alias="productPageId")
+    language: str | None = None
 
 
 class ReportRow(BaseModel):
@@ -270,16 +305,26 @@ class ReportingResponse(BaseModel):
             # Add metadata fields
             if row.metadata:
                 meta_dict = row.metadata.model_dump(by_alias=False, exclude_none=True)
-                # Flatten bid_amount if present
+                # Flatten spend fields in metadata
                 if meta_dict.get("bid_amount"):
                     meta_dict["bid_amount"] = meta_dict["bid_amount"].get("amount")
+                if meta_dict.get("suggested_bid_amount"):
+                    meta_dict["suggested_bid_amount"] = meta_dict["suggested_bid_amount"].get(
+                        "amount"
+                    )
                 base_data.update(meta_dict)
 
             # Add total metrics if present
             if row.total:
                 total_dict = row.total.model_dump(by_alias=False, exclude_none=True)
                 # Flatten spend fields
-                for field in ["avg_cpa", "avg_cpt", "local_spend"]:
+                for field in [
+                    "tap_install_cpi",
+                    "total_avg_cpi",
+                    "avg_cpt",
+                    "avg_cpm",
+                    "local_spend",
+                ]:
                     if total_dict.get(field):
                         total_dict[field] = total_dict[field].get("amount")
                 base_data.update(total_dict)

@@ -50,11 +50,7 @@ class CampaignStatus(StrEnum):
 
 
 class CampaignServingStatus(StrEnum):
-    """The serving status of a campaign.
-
-    This indicates whether the campaign is actively serving ads
-    and why it may not be serving.
-    """
+    """The serving status of a campaign."""
 
     RUNNING = "RUNNING"
     NOT_RUNNING = "NOT_RUNNING"
@@ -63,43 +59,69 @@ class CampaignServingStatus(StrEnum):
 class CampaignServingStateReason(StrEnum):
     """Reasons why a campaign may not be serving."""
 
-    NO_PAYMENT_METHOD_ON_FILE = "NO_PAYMENT_METHOD_ON_FILE"
-    MISSING_BO_OR_INVOICING_FIELDS = "MISSING_BO_OR_INVOICING_FIELDS"
-    PAUSED_BY_USER = "PAUSED_BY_USER"
-    DELETED_BY_USER = "DELETED_BY_USER"
-    CAMPAIGN_END_DATE_REACHED = "CAMPAIGN_END_DATE_REACHED"
-    CAMPAIGN_START_DATE_IN_FUTURE = "CAMPAIGN_START_DATE_IN_FUTURE"
-    DAILY_CAP_EXHAUSTED = "DAILY_CAP_EXHAUSTED"
-    TOTAL_BUDGET_EXHAUSTED = "TOTAL_BUDGET_EXHAUSTED"
-    CREDIT_CARD_DECLINED = "CREDIT_CARD_DECLINED"
+    AD_GROUP_MISSING = "AD_GROUP_MISSING"
+    APP_LANGUAGE_INCOMPATIBLE = "APP_LANGUAGE_INCOMPATIBLE"
+    APP_NOT_CATEGORIZED = "APP_NOT_CATEGORIZED"
     APP_NOT_ELIGIBLE = "APP_NOT_ELIGIBLE"
     APP_NOT_ELIGIBLE_SEARCHADS = "APP_NOT_ELIGIBLE_SEARCHADS"
+    APP_NOT_ELIGIBLE_SUPPLY_SOURCE = "APP_NOT_ELIGIBLE_SUPPLY_SOURCE"
+    APP_NOT_LINKED_TO_CAMPAIGN_GROUP = "APP_NOT_LINKED_TO_CAMPAIGN_GROUP"
     APP_NOT_PUBLISHED_YET = "APP_NOT_PUBLISHED_YET"
-    BO_START_DATE_IN_FUTURE = "BO_START_DATE_IN_FUTURE"
+    APP_SENSITIVE_CONTENT = "APP_SENSITIVE_CONTENT"
     BO_END_DATE_REACHED = "BO_END_DATE_REACHED"
     BO_EXHAUSTED = "BO_EXHAUSTED"
-    ORG_PAYMENT_TYPE_CHANGED = "ORG_PAYMENT_TYPE_CHANGED"
-    ORG_SUSPENDED_POLICY_VIOLATION = "ORG_SUSPENDED_POLICY_VIOLATION"
-    ORG_SUSPENDED_FRAUD = "ORG_SUSPENDED_FRAUD"
-    ORG_CHARGE_BACK_DISPUTED = "ORG_CHARGE_BACK_DISPUTED"
-    LOC_EXHAUSTED = "LOC_EXHAUSTED"
-    TAX_VERIFICATION_PENDING = "TAX_VERIFICATION_PENDING"
-    SAPIN_LAW_AGENT_UNKNOWN = "SAPIN_LAW_AGENT_UNKNOWN"
-    SAPIN_LAW_FRENCH_BIZ_UNKNOWN = "SAPIN_LAW_FRENCH_BIZ_UNKNOWN"
-    SAPIN_LAW_FRENCH_BIZ = "SAPIN_LAW_FRENCH_BIZ"
-    NO_ELIGIBLE_COUNTRIES = "NO_ELIGIBLE_COUNTRIES"
-    AD_GROUP_MISSING = "AD_GROUP_MISSING"
-    MERCHANT_INELIGIBLE = "MERCHANT_INELIGIBLE"
-    NO_AVAILABLE_AD_GROUPS = "NO_AVAILABLE_AD_GROUPS"
+    BO_START_DATE_IN_FUTURE = "BO_START_DATE_IN_FUTURE"
+    CAMPAIGN_END_DATE_REACHED = "CAMPAIGN_END_DATE_REACHED"
+    CAMPAIGN_START_DATE_IN_FUTURE = "CAMPAIGN_START_DATE_IN_FUTURE"
+    CONTENT_PROVIDER_UNLINKED = "CONTENT_PROVIDER_UNLINKED"
+    CREDIT_CARD_DECLINED = "CREDIT_CARD_DECLINED"
+    DAILY_CAP_EXHAUSTED = "DAILY_CAP_EXHAUSTED"
+    DELETED_BY_USER = "DELETED_BY_USER"
     FEATURE_NO_LONGER_AVAILABLE = "FEATURE_NO_LONGER_AVAILABLE"
+    FEATURE_NOT_YET_AVAILABLE = "FEATURE_NOT_YET_AVAILABLE"
+    INELIGIBLE_BUSINESS_LOCATION = "INELIGIBLE_BUSINESS_LOCATION"
+    LOC_EXHAUSTED = "LOC_EXHAUSTED"
+    MISSING_BO_OR_INVOICING_FIELDS = "MISSING_BO_OR_INVOICING_FIELDS"
+    NO_AVAILABLE_AD_GROUPS = "NO_AVAILABLE_AD_GROUPS"
+    NO_ELIGIBLE_COUNTRIES = "NO_ELIGIBLE_COUNTRIES"
+    NO_PAYMENT_METHOD_ON_FILE = "NO_PAYMENT_METHOD_ON_FILE"
+    ORG_CHARGE_BACK_DISPUTED = "ORG_CHARGE_BACK_DISPUTED"
+    ORG_PAYMENT_TYPE_CHANGED = "ORG_PAYMENT_TYPE_CHANGED"
+    ORG_SUSPENDED_FRAUD = "ORG_SUSPENDED_FRAUD"
+    ORG_SUSPENDED_POLICY_VIOLATION = "ORG_SUSPENDED_POLICY_VIOLATION"
+    PAUSED_BY_SYSTEM = "PAUSED_BY_SYSTEM"
+    PAUSED_BY_USER = "PAUSED_BY_USER"
+    SAPIN_LAW_AGENT_UNKNOWN = "SAPIN_LAW_AGENT_UNKNOWN"
+    SAPIN_LAW_FRENCH_BIZ = "SAPIN_LAW_FRENCH_BIZ"
+    SAPIN_LAW_FRENCH_BIZ_UNKNOWN = "SAPIN_LAW_FRENCH_BIZ_UNKNOWN"
+    TAX_VERIFICATION_PENDING = "TAX_VERIFICATION_PENDING"
+    TOTAL_BUDGET_EXHAUSTED = "TOTAL_BUDGET_EXHAUSTED"
+    USER_REQUESTED_ACCOUNT_SUSPENSION = "USER_REQUESTED_ACCOUNT_SUSPENSION"
 
 
 class CampaignCountryOrRegionServingStateReason(StrEnum):
     """Reasons for country/region-specific serving state."""
 
+    ACCOUNT_DOC_APPROVAL_EXPIRED = "ACCOUNT_DOC_APPROVAL_EXPIRED"
+    ACCOUNT_DOC_APPROVAL_INFECTED = "ACCOUNT_DOC_APPROVAL_INFECTED"
+    ACCOUNT_DOC_APPROVAL_NOT_SUBMITTED = "ACCOUNT_DOC_APPROVAL_NOT_SUBMITTED"
+    ACCOUNT_DOC_APPROVAL_PENDING = "ACCOUNT_DOC_APPROVAL_PENDING"
+    ACCOUNT_DOC_APPROVAL_REJECTED = "ACCOUNT_DOC_APPROVAL_REJECTED"
+    APP_CONTENT_REJECTED = "APP_CONTENT_REJECTED"
+    APP_CONTENT_REVIEW_PENDING = "APP_CONTENT_REVIEW_PENDING"
+    APP_DOC_APPROVAL_EXPIRED = "APP_DOC_APPROVAL_EXPIRED"
+    APP_DOC_APPROVAL_INFECTED = "APP_DOC_APPROVAL_INFECTED"
+    APP_DOC_APPROVAL_NOT_SUBMITTED = "APP_DOC_APPROVAL_NOT_SUBMITTED"
+    APP_DOC_APPROVAL_PENDING = "APP_DOC_APPROVAL_PENDING"
+    APP_DOC_APPROVAL_REJECTED = "APP_DOC_APPROVAL_REJECTED"
     APP_NOT_ELIGIBLE = "APP_NOT_ELIGIBLE"
     APP_NOT_ELIGIBLE_SEARCHADS = "APP_NOT_ELIGIBLE_SEARCHADS"
+    APP_NOT_ELIGIBLE_SUPPLY_SOURCE = "APP_NOT_ELIGIBLE_SUPPLY_SOURCE"
     APP_NOT_PUBLISHED_YET = "APP_NOT_PUBLISHED_YET"
+    FEATURE_NOT_AVAILABLE_IN_COUNTRY_OR_REGION = "FEATURE_NOT_AVAILABLE_IN_COUNTRY_OR_REGION"
+    SAPIN_LAW_AGENT_UNKNOWN = "SAPIN_LAW_AGENT_UNKNOWN"
+    SAPIN_LAW_FRENCH_BIZ = "SAPIN_LAW_FRENCH_BIZ"
+    SAPIN_LAW_FRENCH_BIZ_UNKNOWN = "SAPIN_LAW_FRENCH_BIZ_UNKNOWN"
 
 
 class CampaignDisplayStatus(StrEnum):
@@ -124,30 +146,25 @@ class CampaignSupplySource(StrEnum):
     APPSTORE_PRODUCT_PAGES_BROWSE = "APPSTORE_PRODUCT_PAGES_BROWSE"
 
 
-class CountryOrRegionServingState(BaseModel):
-    """Serving state for a specific country or region.
+class BiddingStrategy(StrEnum):
+    """The bidding strategy for a campaign.
 
     Attributes:
-        country_or_region: The ISO country/region code.
-        serving_status: Whether ads are serving in this location.
-        serving_state_reasons: Reasons for the current state.
+        MANUAL_CPT: Manual cost-per-tap bidding.
+        MAX_CONVERSIONS: AI-powered automated bidding that optimizes
+            bids per search query in real time toward a target CPA goal.
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    MANUAL_CPT = "MANUAL_CPT"
+    MAX_CONVERSIONS = "MAX_CONVERSIONS"
 
-    country_or_region: str = Field(alias="countryOrRegion")
-    serving_status: CampaignServingStatus | str = Field(alias="servingStatus")
-    serving_state_reasons: list[CampaignCountryOrRegionServingStateReason | str] | None = Field(
-        default=None, alias="servingStateReasons"
-    )
+
+# Keep as alias for backwards compatibility
+BidStrategyType = BiddingStrategy
 
 
 class Campaign(BaseModel):
     """An Apple Search Ads campaign.
-
-    A campaign is the top-level entity that contains ad groups,
-    keywords, and ads. Each campaign has its own budget and targets
-    specific countries or regions.
 
     Attributes:
         id: The unique identifier for the campaign.
@@ -163,7 +180,10 @@ class Campaign(BaseModel):
         modification_time: When the campaign was last modified.
         display_status: Human-readable status for display.
         supply_sources: Where ads will be shown.
-        country_or_region_serving_states: Per-location serving states.
+        ad_channel_type: The ad channel type (SEARCH/DISPLAY).
+        billing_event: The billing event type (TAPS/IMPRESSIONS).
+        bidding_strategy: The bidding strategy (MANUAL_CPT/MAX_CONVERSIONS).
+        target_cpa: Target cost per acquisition for MAX_CONVERSIONS.
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
@@ -181,16 +201,24 @@ class Campaign(BaseModel):
         default=None, alias="servingStateReasons"
     )
     modification_time: datetime = Field(alias="modificationTime")
+    creation_time: datetime | None = Field(default=None, alias="creationTime")
     display_status: CampaignDisplayStatus | str = Field(alias="displayStatus")
     supply_sources: list[CampaignSupplySource | str] = Field(alias="supplySources")
-    country_or_region_serving_states: list[CountryOrRegionServingState] | None = Field(
-        default=None, alias="countryOrRegionServingStates"
+    ad_channel_type: AdChannelType | str | None = Field(default=None, alias="adChannelType")
+    billing_event: BillingEvent | str | None = Field(default=None, alias="billingEvent")
+    country_or_region_serving_state_reasons: dict[str, list[str]] | None = Field(
+        default=None, alias="countryOrRegionServingStateReasons"
     )
     start_time: datetime | None = Field(default=None, alias="startTime")
     end_time: datetime | None = Field(default=None, alias="endTime")
     loc_invoice_details: dict[str, Any] | None = Field(default=None, alias="locInvoiceDetails")
-    budget_orders: list[dict[str, Any]] | None = Field(default=None, alias="budgetOrders")
+    budget_orders: list[int] | None = Field(default=None, alias="budgetOrders")
     payment_model: str | None = Field(default=None, alias="paymentModel")
+    bidding_strategy: BiddingStrategy | str | None = Field(
+        default=None, alias="biddingStrategy"
+    )
+    target_cpa: Money | None = Field(default=None, alias="targetCpa")
+    deleted: bool = False
 
 
 class CampaignCreate(BaseModel):
@@ -225,8 +253,10 @@ class CampaignCreate(BaseModel):
     start_time: datetime | None = Field(default=None, alias="startTime")
     end_time: datetime | None = Field(default=None, alias="endTime")
     loc_invoice_details: dict[str, Any] | None = Field(default=None, alias="locInvoiceDetails")
-    budget_orders: list[dict[str, Any]] | None = Field(default=None, alias="budgetOrders")
+    budget_orders: list[int] | None = Field(default=None, alias="budgetOrders")
     payment_model: str | None = Field(default=None, alias="paymentModel")
+    bidding_strategy: BiddingStrategy | None = Field(default=None, alias="biddingStrategy")
+    target_cpa: Money | None = Field(default=None, alias="targetCpa")
 
 
 class CampaignUpdate(BaseModel):
@@ -252,4 +282,6 @@ class CampaignUpdate(BaseModel):
     daily_budget_amount: Money | None = Field(default=None, alias="dailyBudgetAmount")
     status: CampaignStatus | None = None
     countries_or_regions: list[str] | None = Field(default=None, alias="countriesOrRegions")
+    bidding_strategy: BiddingStrategy | None = Field(default=None, alias="biddingStrategy")
+    target_cpa: Money | None = Field(default=None, alias="targetCpa")
     loc_invoice_details: dict[str, Any] | None = Field(default=None, alias="locInvoiceDetails")
