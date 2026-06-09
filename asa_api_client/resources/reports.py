@@ -722,7 +722,5 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
             timezone=timezone,
         )
 
-        data = await self._request_async(
-            "POST", f"campaigns/{campaign_id}/ads", json=request
-        )
+        data = await self._request_async("POST", f"campaigns/{campaign_id}/ads", json=request)
         return self._parse_report_response(data)

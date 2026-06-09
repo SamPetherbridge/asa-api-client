@@ -99,9 +99,7 @@ class ProductPageResource(BaseResource[ProductPage, ProductPage, ProductPage]):
         data = await self._request_async("GET", product_page_id)
         return self._parse_response(data)
 
-    def get_locale_details(
-        self, product_page_id: str
-    ) -> builtins.list[ProductPageLocaleDetail]:
+    def get_locale_details(self, product_page_id: str) -> builtins.list[ProductPageLocaleDetail]:
         """Get locale details for a product page.
 
         Args:
