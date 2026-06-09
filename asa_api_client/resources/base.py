@@ -248,7 +248,7 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
         method: str,
         path: str = "",
         *,
-        json: dict[str, Any] | list[dict[str, Any]] | None = None,
+        json: dict[str, Any] | list[dict[str, Any]] | list[int] | None = None,
         params: dict[str, Any] | None = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> dict[str, Any]:
@@ -344,7 +344,7 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
         method: str,
         path: str = "",
         *,
-        json: dict[str, Any] | list[dict[str, Any]] | None = None,
+        json: dict[str, Any] | list[dict[str, Any]] | list[int] | None = None,
         params: dict[str, Any] | None = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> dict[str, Any]:
