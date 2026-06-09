@@ -21,6 +21,4 @@ class AppInfo(BaseModel):
     adam_id: int = Field(alias="adamId")
     app_name: str = Field(alias="appName")
     developer_name: str | None = Field(default=None, alias="developerName")
-    country_or_region_codes: list[str] | None = Field(
-        default=None, alias="countryOrRegionCodes"
-    )
+    country_or_region_codes: list[str] | None = Field(default=None, alias="countryOrRegionCodes")

@@ -214,9 +214,7 @@ class Campaign(BaseModel):
     loc_invoice_details: dict[str, Any] | None = Field(default=None, alias="locInvoiceDetails")
     budget_orders: list[int] | None = Field(default=None, alias="budgetOrders")
     payment_model: str | None = Field(default=None, alias="paymentModel")
-    bidding_strategy: BiddingStrategy | str | None = Field(
-        default=None, alias="biddingStrategy"
-    )
+    bidding_strategy: BiddingStrategy | str | None = Field(default=None, alias="biddingStrategy")
     target_cpa: Money | None = Field(default=None, alias="targetCpa")
     deleted: bool = False
 

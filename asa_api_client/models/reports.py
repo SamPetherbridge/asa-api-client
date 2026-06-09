@@ -196,9 +196,7 @@ class ReportMetadata(BaseModel):
     ad_id: int | None = Field(default=None, alias="adId")
     ad_name: str | None = Field(default=None, alias="adName")
     ad_display_status: str | None = Field(default=None, alias="adDisplayStatus")
-    ad_serving_state_reasons: list[str] | None = Field(
-        default=None, alias="adServingStateReasons"
-    )
+    ad_serving_state_reasons: list[str] | None = Field(default=None, alias="adServingStateReasons")
     creative_type: str | None = Field(default=None, alias="creativeType")
     creative_id: int | None = Field(default=None, alias="creativeId")
     product_page_id: str | None = Field(default=None, alias="productPageId")
