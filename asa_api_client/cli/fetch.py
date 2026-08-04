@@ -189,6 +189,11 @@ async def fetch_all(
         timezone: Reporting timezone passed to the API.
         today: Current date (drives the search-term lookback clip).
         on_progress: Optional callback ``(level_key, completed, total)``.
+            Fires once with ``(level, 0, 0)`` for any level with zero
+            chunks to fetch (e.g. search terms when the whole requested
+            range is older than the trailing 90-day lookback), so callers
+            can treat that level as immediately complete rather than
+            waiting for a tick that will never come.
 
     Returns:
         A :class:`FetchResult` with per-level daily frames (names merged
@@ -204,8 +209,13 @@ async def fetch_all(
     campaign_ids = [int(c) for c in meta["campaign_id"].tolist()]
 
     st_start = max(start, today - timedelta(days=SEARCH_TERM_LOOKBACK))
-    st_windows = chunk_windows(st_start, end) if st_start <= end else []
-    st_clipped = st_start > start
+    # The whole requested range can be older than the lookback (legal: the
+    # overall API lookback is 730 days). That's not "clipped to a smaller
+    # window" — it's "no search-term data available at all" — so it needs
+    # its own note and must not compute a reversed (st_start > end) range.
+    st_out_of_range = st_start > end
+    st_windows = [] if st_out_of_range else chunk_windows(st_start, end)
+    st_clipped = st_start > start and not st_out_of_range
 
     reports = client.reports
     per_campaign: dict[str, Callable[[int, date, date], Awaitable[ReportingResponse]]] = {
@@ -221,6 +231,14 @@ async def fetch_all(
     totals: dict[str, int] = {"campaigns": len(windows) + len(prior_windows)}
     totals |= {key: len(level_windows[key]) * len(campaign_ids) for key in per_campaign}
     done = dict.fromkeys(totals, 0)
+
+    # A level with zero chunks (e.g. search terms entirely outside the
+    # 90-day lookback) never has a chunk task to fire _tick from, so it
+    # would otherwise never report progress at all.
+    if on_progress is not None:
+        for level, total in totals.items():
+            if total == 0:
+                on_progress(level, 0, 0)
 
     semaphore = asyncio.Semaphore(CONCURRENCY)
     warnings: list[str] = []
@@ -277,7 +295,13 @@ async def fetch_all(
         if isinstance(outcome, BaseException):
             raise outcome
 
-    if st_clipped:
+    if st_out_of_range:
+        notes["search_terms"].insert(
+            0,
+            "Search terms are only available for the trailing 90 days; "
+            "no search-term data is available for this range.",
+        )
+    elif st_clipped:
         notes["search_terms"].insert(
             0,
             "Search terms are only available for the trailing 90 days; "

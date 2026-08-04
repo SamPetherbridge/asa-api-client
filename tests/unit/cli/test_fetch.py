@@ -1,12 +1,14 @@
 """Tests for scope resolution and chunked async report fetching."""
 
+import json
 import re
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from pytest_httpx import HTTPXMock
 
 from asa_api_client import AppleSearchAdsClient
+from asa_api_client.cli.dates import SEARCH_TERM_LOOKBACK
 from asa_api_client.cli.fetch import (
     LevelFetchError,
     ScopeError,
@@ -201,12 +203,72 @@ class TestFetchAll:
     async def test_search_terms_clipped_to_90_days(
         self, httpx_mock: HTTPXMock
     ) -> None:
-        """Long ranges clip search terms to trailing 90 days with a note."""
+        """Long ranges clip search terms to trailing 90 days with a note.
+
+        Asserts on the actual requests made, not just the note text: the
+        note is driven by the same flag as the clipping, so an assertion
+        on the note alone would still pass even if clipping silently
+        stopped happening. Confirm search terms only fired for the
+        clipped (1 window x 2 campaigns) fan-out while another level
+        (keywords) fired for the full unclipped (5 windows x 2 campaigns)
+        range, and that the clipped request's body actually starts at the
+        clipped date.
+        """
         _mock_common(httpx_mock)
         self._mock_reports(httpx_mock)
+        clipped_start = TODAY - timedelta(days=SEARCH_TERM_LOOKBACK)
         async with _client() as client:
             meta, _ = resolve_scope(client, None)
             result = await fetch_all(
                 client, meta, date(2025, 8, 6), date(2026, 8, 4), today=TODAY
             )
         assert any("90" in n for n in result.levels["search_terms"].notes)
+
+        st_requests = httpx_mock.get_requests(
+            url=re.compile(rf"{API}/reports/campaigns/\d+/searchterms")
+        )
+        kw_requests = httpx_mock.get_requests(
+            url=re.compile(rf"{API}/reports/campaigns/\d+/keywords")
+        )
+        assert len(st_requests) == 2  # 1 clipped window x 2 campaigns
+        assert len(kw_requests) == 10  # 5 unclipped windows x 2 campaigns
+        assert all(
+            json.loads(r.content)["startTime"] == clipped_start.isoformat()
+            for r in st_requests
+        )
+
+    async def test_search_terms_entirely_outside_lookback(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        """A range entirely older than the 90-day lookback yields no data, not a crash.
+
+        ``st_start`` (today - 90 days) can land *after* ``end`` when the
+        whole requested range predates the lookback (legal: the overall
+        API lookback is 730 days). That must not compute a reversed
+        st_start-end date range in the note, must not issue any
+        search-term requests, and must still report the level as
+        immediately complete via on_progress.
+        """
+        _mock_common(httpx_mock)
+        self._mock_reports(httpx_mock)
+        seen: dict[str, tuple[int, int]] = {}
+        async with _client() as client:
+            meta, _ = resolve_scope(client, None)
+            result = await fetch_all(
+                client,
+                meta,
+                date(2025, 1, 1),
+                date(2025, 1, 31),
+                today=TODAY,
+                on_progress=lambda key, done, total: seen.__setitem__(key, (done, total)),
+            )
+
+        st = result.levels["search_terms"]
+        assert st.daily.empty
+        assert any("no search-term data is available" in n for n in st.notes)
+        would_be_st_start = TODAY - timedelta(days=SEARCH_TERM_LOOKBACK)
+        assert not any(str(would_be_st_start) in n for n in st.notes)
+        assert seen["search_terms"] == (0, 0)
+        assert not httpx_mock.get_requests(
+            url=re.compile(rf"{API}/reports/campaigns/\d+/searchterms")
+        )
