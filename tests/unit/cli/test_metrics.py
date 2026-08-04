@@ -100,6 +100,12 @@ class TestAggregate:
         agg = aggregate(normalize(pd.DataFrame()), LEVEL_KEYS["campaigns"])
         assert agg.empty
 
+    def test_empty_frame_has_derived_columns(self) -> None:
+        """Empty aggregation includes derived metric columns for downstream access."""
+        agg = aggregate(normalize(pd.DataFrame()), LEVEL_KEYS["campaigns"])
+        assert {"ttr", "cvr", "cpt", "cpa"} <= set(agg.columns)
+        assert agg.empty
+
 
 class TestKpisAndDeltas:
     """kpis/deltas: headline numbers and prior-period comparison."""
@@ -132,6 +138,12 @@ class TestSummaryTables:
         """One row per app."""
         pa = per_app(_daily())
         assert set(pa["app_name"]) == {"App A", "App B"}
+
+    def test_empty_per_app_has_derived_columns(self) -> None:
+        """Empty per_app includes derived metric columns for downstream access."""
+        pa = per_app(normalize(pd.DataFrame()))
+        assert {"ttr", "cvr", "cpt", "cpa"} <= set(pa.columns)
+        assert pa.empty
 
     def test_top_and_wasted_keywords(self) -> None:
         """Top-5 by installs; wasted = spend>0, installs==0."""

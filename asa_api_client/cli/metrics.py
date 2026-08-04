@@ -82,8 +82,13 @@ def aggregate(df: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
         Per-entity frame with metric sums, carried label columns, derived
         metrics, sorted by spend descending. Empty in → empty out.
     """
-    if df.empty or any(k not in df.columns for k in keys):
-        return pd.DataFrame(columns=[*keys, *_LABEL_COLUMNS, *METRIC_SUMS])
+    if any(k not in df.columns for k in keys):
+        # Missing key columns; create empty frame with correct schema
+        label_cols = [c for c in _LABEL_COLUMNS if c in df.columns]
+        empty = pd.DataFrame(columns=[*keys, *label_cols, *METRIC_SUMS])
+        empty = add_derived(empty)
+        return empty
+    # Key columns present; proceed with aggregation (empty df handled below)
     label_cols = [c for c in _LABEL_COLUMNS if c in df.columns]
     agg_spec: dict[str, str] = dict.fromkeys(label_cols, "first")
     agg_spec |= dict.fromkeys(METRIC_SUMS, "sum")
@@ -151,8 +156,12 @@ def per_app(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Per-app frame with metric sums and derived metrics, spend-desc.
     """
-    if df.empty or "app_name" not in df.columns:
-        return pd.DataFrame(columns=["app_name", *METRIC_SUMS])
+    if "app_name" not in df.columns:
+        # Missing app_name column; create empty frame with correct schema
+        empty = pd.DataFrame(columns=["app_name", *METRIC_SUMS])
+        empty = add_derived(empty)
+        return empty
+    # app_name present; proceed with aggregation (empty df handled below)
     out = df.groupby("app_name", as_index=False)[METRIC_SUMS].sum()
     out = add_derived(out)
     return out.sort_values("spend", ascending=False, ignore_index=True)
