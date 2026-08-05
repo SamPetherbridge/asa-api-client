@@ -200,8 +200,13 @@ async def fetch_all(
         on), the prior-period campaign frame, and accumulated warnings.
 
     Raises:
-        LevelFetchError: If the campaign level fails, or every chunk of
-            any other level fails.
+        LevelFetchError: If the current-period campaign window fails, or
+            every chunk of any other level fails. Prior-period campaign
+            window failures do not raise: the prior period only feeds
+            Summary-sheet KPI deltas, so a failure there (e.g. an
+            explicit range whose prior window predates the 730-day API
+            lookback) degrades to a warning and an empty/partial
+            ``prior_campaigns`` frame instead of aborting the run.
     """
     windows = chunk_windows(start, end)
     p_start, p_end = prior_window(start, end)
@@ -259,6 +264,12 @@ async def fetch_all(
                     win[0], win[1], campaign_ids=campaign_ids, timezone=timezone
                 )
             except AppleSearchAdsError as exc:
+                if prior:
+                    warnings.append(
+                        f"Prior period: window {win[0]}-{win[1]} failed: {exc}; "
+                        "prior-period deltas omitted"
+                    )
+                    return
                 raise LevelFetchError(
                     f"Campaigns report failed for {win[0]}-{win[1]}: {exc}"
                 ) from exc

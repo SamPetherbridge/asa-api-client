@@ -4,11 +4,12 @@ import json
 import re
 from datetime import date, timedelta
 
+import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
 from asa_api_client import AppleSearchAdsClient
-from asa_api_client.cli.dates import SEARCH_TERM_LOOKBACK
+from asa_api_client.cli.dates import SEARCH_TERM_LOOKBACK, prior_window
 from asa_api_client.cli.fetch import (
     LevelFetchError,
     ScopeError,
@@ -115,15 +116,13 @@ class TestFetchAll:
     """fetch_all: five levels + prior period, failure tolerance."""
 
     def _mock_reports(self, httpx_mock: HTTPXMock) -> None:
-        rows = [
-            report_row(
-                {"campaignId": 1, "campaignName": "One"},
-                [("2026-07-01", 100, 10, 1, "5.0"), ("2026-07-02", 100, 10, 1, "5.0")],
-            )
-        ]
         httpx_mock.add_response(
-            url=f"{API}/reports/campaigns", json=report_json(rows), is_reusable=True
+            url=f"{API}/reports/campaigns", json=report_json(self._rows()), is_reusable=True
         )
+        self._mock_per_campaign_reports(httpx_mock)
+
+    def _mock_per_campaign_reports(self, httpx_mock: HTTPXMock) -> None:
+        rows = self._rows()
         for cid in (1, 2):
             for tail in ("adgroups", "keywords", "searchterms", "ads"):
                 httpx_mock.add_response(
@@ -131,6 +130,15 @@ class TestFetchAll:
                     json=report_json(rows),
                     is_reusable=True,
                 )
+
+    @staticmethod
+    def _rows() -> list[dict[str, object]]:
+        return [
+            report_row(
+                {"campaignId": 1, "campaignName": "One"},
+                [("2026-07-01", 100, 10, 1, "5.0"), ("2026-07-02", 100, 10, 1, "5.0")],
+            )
+        ]
 
     async def test_happy_path(self, httpx_mock: HTTPXMock) -> None:
         """All five levels populated; prior campaigns fetched; names merged."""
@@ -180,6 +188,50 @@ class TestFetchAll:
         assert any("Keywords" in w for w in result.warnings)
         assert result.levels["keywords"].notes
         assert not result.levels["keywords"].daily.empty  # campaign 1 still there
+
+    async def test_prior_campaign_window_failure_warns_and_continues(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        """A failing prior-period campaign fetch degrades to a warning.
+
+        Current and prior windows both hit ``POST /reports/campaigns``, so
+        a single failure mock would be nondeterministic about which window
+        it catches. Instead, a single reusable callback inspects the
+        request body's ``startTime`` and only fails the prior window's
+        date range — deterministic regardless of task scheduling order.
+        This replaces (rather than adds to) the reusable success mock for
+        that URL: pytest-httpx only falls through to a later-registered
+        matcher once an earlier one has already been used once, so a
+        second, unconditional success mock for the same URL would shadow
+        this callback on the second of the two campaign requests.
+        """
+        _mock_common(httpx_mock)
+        prior_start, _ = prior_window(START, END)
+
+        def campaigns_callback(request: httpx.Request) -> httpx.Response:
+            body = json.loads(request.content)
+            if body["startTime"] == prior_start.isoformat():
+                return httpx.Response(
+                    status_code=400,
+                    json={"error": {"errors": [{"message": "lookback exceeded"}]}},
+                )
+            return httpx.Response(status_code=200, json=report_json(self._rows()))
+
+        httpx_mock.add_callback(
+            campaigns_callback, url=f"{API}/reports/campaigns", is_reusable=True
+        )
+        self._mock_per_campaign_reports(httpx_mock)
+        seen: dict[str, tuple[int, int]] = {}
+        async with _client() as client:
+            meta, _ = resolve_scope(client, None)
+            result = await fetch_all(
+                client, meta, START, END, today=TODAY,
+                on_progress=lambda key, done, total: seen.__setitem__(key, (done, total)),
+            )
+        assert result.prior_campaigns.empty
+        assert any("Prior period" in w for w in result.warnings)
+        assert not result.levels["campaigns"].daily.empty
+        assert seen["campaigns"] == (2, 2)  # current + prior window still ticked
 
     async def test_whole_level_failure_raises(
         self, httpx_mock: HTTPXMock
