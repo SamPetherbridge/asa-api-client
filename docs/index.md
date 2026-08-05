@@ -38,7 +38,7 @@ with client:
 
 ## CLI Tool
 
-For a command-line interface, see [asa-api-cli](https://github.com/SamPetherbridge/asa-api-cli).
+For a command-line interface, see the [CLI guide](guide/cli.md).
 
 ## License
 
