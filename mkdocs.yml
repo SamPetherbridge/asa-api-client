@@ -65,6 +65,7 @@ nav:
     - Keywords: guide/keywords.md
     - Reports: guide/reports.md
     - Async Usage: guide/async.md
+    - CLI: guide/cli.md
   - API Reference:
     - Client: api/client.md
     - Models: api/models.md

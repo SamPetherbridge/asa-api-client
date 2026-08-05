@@ -180,13 +180,14 @@ asyncio.run(main())
 
 ## CLI
 
-For a command-line interface, install [asa-api-cli](https://github.com/SamPetherbridge/asa-api-cli):
+Generate a formatted Excel analysis workbook with the included `asa analyze` CLI:
 
 ```bash
-uv tool install asa-api-cli
-# or
-pip install asa-api-cli
+pip install "asa-api-client[cli]"
+asa analyze --period 90d --output report.xlsx
 ```
+
+The workbook includes a summary sheet with KPIs and trends, formatted analysis sheets per reporting level, and raw daily data for pivoting. For details, see the [CLI guide](https://asa-api-client.peth.au/user-guide/cli/).
 
 ## License
 
