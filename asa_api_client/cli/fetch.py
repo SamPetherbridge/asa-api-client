@@ -226,9 +226,7 @@ async def fetch_all(
     per_campaign: dict[str, Callable[[int, date, date], Awaitable[ReportingResponse]]] = {
         "ad_groups": lambda cid, s, e: reports.ad_groups_async(cid, s, e, timezone=timezone),
         "keywords": lambda cid, s, e: reports.keywords_async(cid, s, e, timezone=timezone),
-        "search_terms": lambda cid, s, e: reports.search_terms_async(
-            cid, s, e, timezone=timezone
-        ),
+        "search_terms": lambda cid, s, e: reports.search_terms_async(cid, s, e, timezone=timezone),
         "ads": lambda cid, s, e: reports.ads_async(cid, s, e, timezone=timezone),
     }
     level_windows = {key: st_windows if key == "search_terms" else windows for key in per_campaign}
@@ -296,9 +294,7 @@ async def fetch_all(
     tasks += [_campaign_window(win, prior=False) for win in windows]
     tasks += [_campaign_window(win, prior=True) for win in prior_windows]
     for level in per_campaign:
-        tasks += [
-            _chunk(level, cid, win) for cid in campaign_ids for win in level_windows[level]
-        ]
+        tasks += [_chunk(level, cid, win) for cid in campaign_ids for win in level_windows[level]]
     # return_exceptions=True lets every in-flight request finish before we
     # re-raise, so an aborting run doesn't leave tasks using a closing client.
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -322,9 +318,7 @@ async def fetch_all(
     levels: dict[str, LevelData] = {}
     for key, label in LEVELS:
         if key != "campaigns" and failures[key] and not frames[key]:
-            raise LevelFetchError(
-                f"{label}: every request failed; first error: {notes[key][0]}"
-            )
+            raise LevelFetchError(f"{label}: every request failed; first error: {notes[key][0]}")
         daily = pd.concat(frames[key], ignore_index=True) if frames[key] else pd.DataFrame()
         levels[key] = LevelData(label=label, daily=_merge_names(daily, meta), notes=notes[key])
 

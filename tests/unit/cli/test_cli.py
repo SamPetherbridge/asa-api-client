@@ -89,17 +89,21 @@ class TestAnalyzeCommand:
     ) -> None:
         """No env vars → one-line configuration error, no traceback."""
         monkeypatch.chdir(tmp_path)  # hermetic: don't pick up a stray repo .env
-        for var in ("ASA_CLIENT_ID", "ASA_TEAM_ID", "ASA_KEY_ID", "ASA_ORG_ID",
-                    "ASA_PRIVATE_KEY", "ASA_PRIVATE_KEY_PATH"):
+        for var in (
+            "ASA_CLIENT_ID",
+            "ASA_TEAM_ID",
+            "ASA_KEY_ID",
+            "ASA_ORG_ID",
+            "ASA_PRIVATE_KEY",
+            "ASA_PRIVATE_KEY_PATH",
+        ):
             monkeypatch.delenv(var, raising=False)
         result = runner.invoke(app, ["analyze"])
         assert result.exit_code == 1
         assert result.exception is None or isinstance(result.exception, SystemExit)
 
     @pytest.mark.usefixtures("asa_env")
-    def test_unwritable_output_clean_error(
-        self, httpx_mock: HTTPXMock, tmp_path: Path
-    ) -> None:
+    def test_unwritable_output_clean_error(self, httpx_mock: HTTPXMock, tmp_path: Path) -> None:
         """A bad --output path fails cleanly, not with a raw traceback."""
         _mock_api(httpx_mock)
         out = tmp_path / "does-not-exist" / "report.xlsx"

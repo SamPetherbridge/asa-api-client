@@ -221,7 +221,10 @@ def _write_analysis_sheet(
     )
     red_fill = book.add_format({"bg_color": "#FEE2E2"})
     ws.conditional_format(
-        1, 0, last_row, n_cols - 1,
+        1,
+        0,
+        last_row,
+        n_cols - 1,
         {
             "type": "formula",
             "criteria": f"=AND(${spend_c}2>0,${installs_c}2=0)",
@@ -232,7 +235,10 @@ def _write_analysis_sheet(
         amber = book.add_format({"bg_color": "#FEF3C7"})
         green = book.add_format({"bg_color": "#DCFCE7"})
         ws.conditional_format(
-            1, cpa_idx, last_row, cpa_idx,
+            1,
+            cpa_idx,
+            last_row,
+            cpa_idx,
             {
                 "type": "formula",
                 "criteria": f"=AND(ISNUMBER(${cpa_c}2),${cpa_c}2>{cpa_benchmark * 1.5})",
@@ -240,12 +246,14 @@ def _write_analysis_sheet(
             },
         )
         ws.conditional_format(
-            1, cpa_idx, last_row, cpa_idx,
+            1,
+            cpa_idx,
+            last_row,
+            cpa_idx,
             {
                 "type": "formula",
                 "criteria": (
-                    f"=AND(ISNUMBER(${cpa_c}2),${cpa_c}2<{cpa_benchmark * 0.75},"
-                    f"${installs_c}2>=5)"
+                    f"=AND(ISNUMBER(${cpa_c}2),${cpa_c}2<{cpa_benchmark * 0.75},${installs_c}2>=5)"
                 ),
                 "format": green,
             },
@@ -277,9 +285,7 @@ def _delta_cell(key: str, delta: float | None) -> tuple[str, str]:
     return f"{arrow} {abs(delta):.1%} vs prior", fmt
 
 
-def _write_summary(
-    book: Any, summary: SummaryData, fmts: dict[str, Format]
-) -> None:
+def _write_summary(book: Any, summary: SummaryData, fmts: dict[str, Format]) -> None:
     """Write the Summary sheet: title, KPI band, chart, callouts."""
     ws = book.add_worksheet("Summary")
     ws.set_column(0, 8, 16)
@@ -293,9 +299,7 @@ def _write_summary(
     )
 
     kpi_fmt = {"currency": "kpi_currency", "int": "kpi_int", "percent": "kpi_percent"}
-    kpi_deltas = (
-        _deltas(summary.kpis, summary.prior_kpis) if summary.prior_kpis else {}
-    )
+    kpi_deltas = _deltas(summary.kpis, summary.prior_kpis) if summary.prior_kpis else {}
     for idx, (label, key, kind) in enumerate(KPI_SPEC):
         ws.write_string(3, idx, label, fmts["kpi_label"])
         _write_value(ws, 4, idx, summary.kpis.get(key), fmts[kpi_fmt[kind]], fmts["dash"])
@@ -335,8 +339,13 @@ def _write_summary(
     row = 25  # clear of the chart, which spans roughly rows 8-24
     ws.write_string(row, 0, "Top 5 keywords by installs", fmts["callout_header"])
     top_last = _write_table(
-        ws, summary.top_keywords, _CALLOUT_SPEC, fmts,
-        start_row=row + 1, autofilter=False, freeze=False,
+        ws,
+        summary.top_keywords,
+        _CALLOUT_SPEC,
+        fmts,
+        start_row=row + 1,
+        autofilter=False,
+        freeze=False,
     )
     ws.write_string(row, 5, "Wasted spend", fmts["callout_header"])
     wasted_spec = [(c, h, k) for c, h, k in _CALLOUT_SPEC if c != "cpa"]
@@ -352,8 +361,13 @@ def _write_summary(
         app_row = max(top_last, wasted_last) + 4
         ws.write_string(app_row, 0, "Per-app breakdown", fmts["callout_header"])
         _write_table(
-            ws, summary.per_app, _PER_APP_SPEC, fmts,
-            start_row=app_row + 1, autofilter=False, freeze=False,
+            ws,
+            summary.per_app,
+            _PER_APP_SPEC,
+            fmts,
+            start_row=app_row + 1,
+            autofilter=False,
+            freeze=False,
         )
 
 
@@ -410,8 +424,12 @@ def write_workbook(
         cpa_benchmark = summary.kpis.get("cpa")
         for key, label in LEVELS:
             _write_analysis_sheet(
-                book, label, analysis.get(key, pd.DataFrame()),
-                ANALYSIS_COLUMNS[key], fmts, cpa_benchmark,
+                book,
+                label,
+                analysis.get(key, pd.DataFrame()),
+                ANALYSIS_COLUMNS[key],
+                fmts,
+                cpa_benchmark,
             )
         for key, label in LEVELS:
             ws = book.add_worksheet(f"Daily · {label}")

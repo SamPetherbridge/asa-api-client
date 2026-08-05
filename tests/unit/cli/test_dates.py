@@ -26,9 +26,7 @@ class TestResolveRange:
 
     def test_explicit_overrides_period(self) -> None:
         """--from/--to win over --period."""
-        start, end = resolve_range(
-            "30d", date(2026, 1, 1), date(2026, 3, 31), today=TODAY
-        )
+        start, end = resolve_range("30d", date(2026, 1, 1), date(2026, 3, 31), today=TODAY)
         assert (start, end) == (date(2026, 1, 1), date(2026, 3, 31))
 
     def test_from_without_to_defaults_to_yesterday(self) -> None:

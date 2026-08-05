@@ -51,13 +51,9 @@ def resolve_range(
     if start > end:
         raise ValueError(f"--from ({start}) must be before --to ({end})")
     if end > yesterday:
-        raise ValueError(
-            f"--to ({end}) must not be in the future; latest full day is {yesterday}"
-        )
+        raise ValueError(f"--to ({end}) must not be in the future; latest full day is {yesterday}")
     if start < today - timedelta(days=MAX_LOOKBACK_DAYS):
-        raise ValueError(
-            f"--from ({start}) is beyond the API lookback of {MAX_LOOKBACK_DAYS} days"
-        )
+        raise ValueError(f"--from ({start}) is beyond the API lookback of {MAX_LOOKBACK_DAYS} days")
 
     return start, end
 

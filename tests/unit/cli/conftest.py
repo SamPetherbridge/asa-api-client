@@ -34,6 +34,7 @@ def token_json() -> dict[str, Any]:
 
 def campaigns_json() -> dict[str, Any]:
     """Two campaigns for two apps."""
+
     def campaign(cid: int, name: str, adam: int) -> dict[str, Any]:
         return {
             "id": cid,

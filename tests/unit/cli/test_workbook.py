@@ -14,14 +14,28 @@ def _campaign_daily() -> pd.DataFrame:
     return normalize(
         pd.DataFrame(
             [
-                {"date": "2026-07-01", "campaign_id": 1, "campaign_name": "One",
-                 "campaign_status": "ENABLED", "app_name": "App A",
-                 "impressions": 1000, "taps": 100, "total_installs": 10,
-                 "local_spend": "50.0"},
-                {"date": "2026-07-02", "campaign_id": 2, "campaign_name": "Two",
-                 "campaign_status": "ENABLED", "app_name": "App B",
-                 "impressions": 500, "taps": 5, "total_installs": 0,
-                 "local_spend": "25.0"},
+                {
+                    "date": "2026-07-01",
+                    "campaign_id": 1,
+                    "campaign_name": "One",
+                    "campaign_status": "ENABLED",
+                    "app_name": "App A",
+                    "impressions": 1000,
+                    "taps": 100,
+                    "total_installs": 10,
+                    "local_spend": "50.0",
+                },
+                {
+                    "date": "2026-07-02",
+                    "campaign_id": 2,
+                    "campaign_name": "Two",
+                    "campaign_status": "ENABLED",
+                    "app_name": "App B",
+                    "impressions": 500,
+                    "taps": 5,
+                    "total_installs": 0,
+                    "local_spend": "25.0",
+                },
             ]
         )
     )
@@ -32,14 +46,30 @@ def _keyword_agg() -> pd.DataFrame:
         normalize(
             pd.DataFrame(
                 [
-                    {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 11,
-                     "keyword": "good", "campaign_name": "One", "ad_group_name": "AG",
-                     "impressions": 100, "taps": 10, "total_installs": 5,
-                     "local_spend": "10"},
-                    {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 12,
-                     "keyword": "bad", "campaign_name": "One", "ad_group_name": "AG",
-                     "impressions": 100, "taps": 10, "total_installs": 0,
-                     "local_spend": "30"},
+                    {
+                        "campaign_id": 1,
+                        "ad_group_id": 1,
+                        "keyword_id": 11,
+                        "keyword": "good",
+                        "campaign_name": "One",
+                        "ad_group_name": "AG",
+                        "impressions": 100,
+                        "taps": 10,
+                        "total_installs": 5,
+                        "local_spend": "10",
+                    },
+                    {
+                        "campaign_id": 1,
+                        "ad_group_id": 1,
+                        "keyword_id": 12,
+                        "keyword": "bad",
+                        "campaign_name": "One",
+                        "ad_group_name": "AG",
+                        "impressions": 100,
+                        "taps": 10,
+                        "total_installs": 0,
+                        "local_spend": "30",
+                    },
                 ]
             )
         ),
@@ -57,16 +87,37 @@ def _write(tmp_path: Path) -> Path:
         period_label="2026-07-01 – 2026-07-02 (2 days)",  # noqa: RUF001
         timezone="UTC",
         generated_at=datetime(2026, 8, 5, 9, 30),
-        kpis={"spend": 75.0, "impressions": 1500.0, "taps": 105.0, "installs": 10.0,
-              "ttr": 0.07, "cvr": 0.095, "cpt": 0.714, "cpa": 7.5},
-        prior_kpis={"spend": 50.0, "impressions": 1000.0, "taps": 100.0, "installs": 20.0,
-                    "ttr": 0.1, "cvr": 0.2, "cpt": 0.5, "cpa": 2.5},
+        kpis={
+            "spend": 75.0,
+            "impressions": 1500.0,
+            "taps": 105.0,
+            "installs": 10.0,
+            "ttr": 0.07,
+            "cvr": 0.095,
+            "cpt": 0.714,
+            "cpa": 7.5,
+        },
+        prior_kpis={
+            "spend": 50.0,
+            "impressions": 1000.0,
+            "taps": 100.0,
+            "installs": 20.0,
+            "ttr": 0.1,
+            "cvr": 0.2,
+            "cpt": 0.5,
+            "cpa": 2.5,
+        },
         daily=pd.DataFrame(
             {"date": ["2026-07-01", "2026-07-02"], "spend": [50.0, 25.0], "installs": [10, 0]}
         ),
         per_app=pd.DataFrame(
-            {"app_name": ["App A", "App B"], "spend": [50.0, 25.0],
-             "impressions": [1000, 500], "taps": [100, 5], "installs": [10, 0]}
+            {
+                "app_name": ["App A", "App B"],
+                "spend": [50.0, 25.0],
+                "impressions": [1000, 500],
+                "taps": [100, 5],
+                "installs": [10, 0],
+            }
         ),
         top_keywords=kw.head(5),
         wasted=kw[(kw["spend"] > 0) & (kw["installs"] == 0)],
@@ -75,12 +126,27 @@ def _write(tmp_path: Path) -> Path:
     write_workbook(
         path,
         summary=summary,
-        analysis={"campaigns": camp_agg, "ad_groups": empty, "keywords": kw,
-                  "search_terms": empty, "ads": empty},
-        daily={"campaigns": daily, "ad_groups": empty, "keywords": empty,
-               "search_terms": empty, "ads": empty},
-        notes={"campaigns": [], "ad_groups": [], "keywords": [],
-               "search_terms": ["Search terms limited to trailing 90 days."], "ads": []},
+        analysis={
+            "campaigns": camp_agg,
+            "ad_groups": empty,
+            "keywords": kw,
+            "search_terms": empty,
+            "ads": empty,
+        },
+        daily={
+            "campaigns": daily,
+            "ad_groups": empty,
+            "keywords": empty,
+            "search_terms": empty,
+            "ads": empty,
+        },
+        notes={
+            "campaigns": [],
+            "ad_groups": [],
+            "keywords": [],
+            "search_terms": ["Search terms limited to trailing 90 days."],
+            "ads": [],
+        },
     )
     return path
 
@@ -91,9 +157,19 @@ class TestWorkbook:
     def test_sheet_order(self, tmp_path: Path) -> None:
         """Summary, five analysis sheets, then grey daily sheets."""
         wb = load_workbook(_write(tmp_path))
-        expected = ["Summary", "Campaigns", "Ad Groups", "Keywords", "Search Terms",
-                    "Ads", "Daily · Campaigns", "Daily · Ad Groups", "Daily · Keywords",
-                    "Daily · Search Terms", "Daily · Ads"]
+        expected = [
+            "Summary",
+            "Campaigns",
+            "Ad Groups",
+            "Keywords",
+            "Search Terms",
+            "Ads",
+            "Daily · Campaigns",
+            "Daily · Ad Groups",
+            "Daily · Keywords",
+            "Daily · Search Terms",
+            "Daily · Ads",
+        ]
         visible = [n for n in wb.sheetnames if n != "Chart Data"]
         assert visible == expected
 

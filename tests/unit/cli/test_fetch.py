@@ -161,15 +161,17 @@ class TestFetchAll:
         async with _client() as client:
             meta, _ = resolve_scope(client, None)
             await fetch_all(
-                client, meta, START, END, today=TODAY,
+                client,
+                meta,
+                START,
+                END,
+                today=TODAY,
                 on_progress=lambda key, done, total: seen.__setitem__(key, (done, total)),
             )
         assert seen["campaigns"] == (2, 2)  # current + prior window
         assert seen["keywords"] == (2, 2)  # one window x two campaigns
 
-    async def test_chunk_failure_warns_and_continues(
-        self, httpx_mock: HTTPXMock
-    ) -> None:
+    async def test_chunk_failure_warns_and_continues(self, httpx_mock: HTTPXMock) -> None:
         """A failing per-campaign chunk becomes a warning + note, not a crash.
 
         The failure response is registered BEFORE the reusable success
@@ -178,8 +180,10 @@ class TestFetchAll:
         """
         _mock_common(httpx_mock)
         httpx_mock.add_response(
-            url=f"{API}/reports/campaigns/2/keywords", status_code=400,
-            json={"error": {"errors": [{"message": "boom"}]}}, is_reusable=True,
+            url=f"{API}/reports/campaigns/2/keywords",
+            status_code=400,
+            json={"error": {"errors": [{"message": "boom"}]}},
+            is_reusable=True,
         )
         self._mock_reports(httpx_mock)
         async with _client() as client:
@@ -225,7 +229,11 @@ class TestFetchAll:
         async with _client() as client:
             meta, _ = resolve_scope(client, None)
             result = await fetch_all(
-                client, meta, START, END, today=TODAY,
+                client,
+                meta,
+                START,
+                END,
+                today=TODAY,
                 on_progress=lambda key, done, total: seen.__setitem__(key, (done, total)),
             )
         assert result.prior_campaigns.empty
@@ -233,9 +241,7 @@ class TestFetchAll:
         assert not result.levels["campaigns"].daily.empty
         assert seen["campaigns"] == (2, 2)  # current + prior window still ticked
 
-    async def test_whole_level_failure_raises(
-        self, httpx_mock: HTTPXMock
-    ) -> None:
+    async def test_whole_level_failure_raises(self, httpx_mock: HTTPXMock) -> None:
         """Every chunk of a level failing aborts the run with context.
 
         Failure mocks registered first — see the note on the previous test.
@@ -243,8 +249,10 @@ class TestFetchAll:
         _mock_common(httpx_mock)
         for cid in (1, 2):
             httpx_mock.add_response(
-                url=f"{API}/reports/campaigns/{cid}/ads", status_code=400,
-                json={"error": {"errors": [{"message": "no ads"}]}}, is_reusable=True,
+                url=f"{API}/reports/campaigns/{cid}/ads",
+                status_code=400,
+                json={"error": {"errors": [{"message": "no ads"}]}},
+                is_reusable=True,
             )
         self._mock_reports(httpx_mock)
         async with _client() as client:
@@ -252,9 +260,7 @@ class TestFetchAll:
             with pytest.raises(LevelFetchError, match="Ads"):
                 await fetch_all(client, meta, START, END, today=TODAY)
 
-    async def test_search_terms_clipped_to_90_days(
-        self, httpx_mock: HTTPXMock
-    ) -> None:
+    async def test_search_terms_clipped_to_90_days(self, httpx_mock: HTTPXMock) -> None:
         """Long ranges clip search terms to trailing 90 days with a note.
 
         Asserts on the actual requests made, not just the note text: the
@@ -271,9 +277,7 @@ class TestFetchAll:
         clipped_start = TODAY - timedelta(days=SEARCH_TERM_LOOKBACK)
         async with _client() as client:
             meta, _ = resolve_scope(client, None)
-            result = await fetch_all(
-                client, meta, date(2025, 8, 6), date(2026, 8, 4), today=TODAY
-            )
+            result = await fetch_all(client, meta, date(2025, 8, 6), date(2026, 8, 4), today=TODAY)
         assert any("90" in n for n in result.levels["search_terms"].notes)
 
         st_requests = httpx_mock.get_requests(
@@ -285,13 +289,10 @@ class TestFetchAll:
         assert len(st_requests) == 2  # 1 clipped window x 2 campaigns
         assert len(kw_requests) == 10  # 5 unclipped windows x 2 campaigns
         assert all(
-            json.loads(r.content)["startTime"] == clipped_start.isoformat()
-            for r in st_requests
+            json.loads(r.content)["startTime"] == clipped_start.isoformat() for r in st_requests
         )
 
-    async def test_search_terms_entirely_outside_lookback(
-        self, httpx_mock: HTTPXMock
-    ) -> None:
+    async def test_search_terms_entirely_outside_lookback(self, httpx_mock: HTTPXMock) -> None:
         """A range entirely older than the 90-day lookback yields no data, not a crash.
 
         ``st_start`` (today - 90 days) can land *after* ``end`` when the

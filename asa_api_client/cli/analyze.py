@@ -35,8 +35,13 @@ class Period(StrEnum):
 
 
 _CURRENCY_FORMATS = {
-    "USD": "$#,##0.00", "AUD": "$#,##0.00", "CAD": "$#,##0.00", "NZD": "$#,##0.00",
-    "EUR": "€#,##0.00", "GBP": "£#,##0.00", "JPY": "¥#,##0",
+    "USD": "$#,##0.00",
+    "AUD": "$#,##0.00",
+    "CAD": "$#,##0.00",
+    "NZD": "$#,##0.00",
+    "EUR": "€#,##0.00",
+    "GBP": "£#,##0.00",
+    "JPY": "¥#,##0",
 }
 
 
@@ -50,7 +55,7 @@ def _currency_format(code: str | None) -> str:
 def _currency_symbol(currency_format: str) -> str:
     """First non-format character of the currency format, for the headline."""
     head = currency_format[0]
-    return head if head not in "#0[\"" else "$"
+    return head if head not in '#0["' else "$"
 
 
 def _fail(message: str) -> "typer.Exit":
@@ -77,8 +82,13 @@ async def _fetch(
 
     try:
         return await fetch.fetch_all(
-            client, meta, start, end, timezone=timezone,
-            today=datetime.now(tz=UTC).date(), on_progress=on_progress,
+            client,
+            meta,
+            start,
+            end,
+            timezone=timezone,
+            today=datetime.now(tz=UTC).date(),
+            on_progress=on_progress,
         )
     finally:
         await client.aclose()
@@ -104,9 +114,7 @@ def analyze(
     output: Annotated[
         Path | None, typer.Option("--output", "-o", help="Output .xlsx path.")
     ] = None,
-    timezone: Annotated[
-        str, typer.Option("--timezone", help="Reporting timezone.")
-    ] = "UTC",
+    timezone: Annotated[str, typer.Option("--timezone", help="Reporting timezone.")] = "UTC",
     currency_format: Annotated[
         str | None,
         typer.Option("--currency-format", help="Excel number format for money."),
@@ -151,8 +159,7 @@ def analyze(
 
     daily_frames = {key: metrics.normalize(lv.daily) for key, lv in result.levels.items()}
     analysis = {
-        key: metrics.aggregate(daily_frames[key], metrics.LEVEL_KEYS[key])
-        for key in daily_frames
+        key: metrics.aggregate(daily_frames[key], metrics.LEVEL_KEYS[key]) for key in daily_frames
     }
     campaign_daily = daily_frames["campaigns"]
     current_kpis = metrics.kpis(campaign_daily)
@@ -189,8 +196,12 @@ def analyze(
     notes = {key: lv.notes for key, lv in result.levels.items()}
     try:
         write_workbook(
-            out_path, summary=summary, analysis=analysis, daily=daily_frames,
-            notes=notes, currency_format=fmt,
+            out_path,
+            summary=summary,
+            analysis=analysis,
+            daily=daily_frames,
+            notes=notes,
+            currency_format=fmt,
         )
     except (OSError, XlsxWriterException) as exc:
         raise _fail(f"Could not write {out_path}: {exc}") from exc
@@ -202,6 +213,5 @@ def analyze(
     cpa_text = f"{symbol}{cpa:,.2f} CPA" if cpa == cpa else "— CPA"
     typer.echo(str(out_path))
     typer.echo(
-        f"{symbol}{spend:,.0f} spend · {installs} installs · {cpa_text} "
-        f"over {day_count} days"
+        f"{symbol}{spend:,.0f} spend · {installs} installs · {cpa_text} over {day_count} days"
     )

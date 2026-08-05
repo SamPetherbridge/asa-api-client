@@ -23,15 +23,36 @@ def _daily() -> pd.DataFrame:
     return normalize(
         pd.DataFrame(
             [
-                {"date": "2026-07-01", "campaign_id": 1, "campaign_name": "One",
-                 "app_name": "App A", "impressions": 1000, "taps": 100,
-                 "total_installs": 10, "local_spend": "50.0"},
-                {"date": "2026-07-02", "campaign_id": 1, "campaign_name": "One",
-                 "app_name": "App A", "impressions": 1000, "taps": 100,
-                 "total_installs": 10, "local_spend": "50.0"},
-                {"date": "2026-07-01", "campaign_id": 2, "campaign_name": "Two",
-                 "app_name": "App B", "impressions": 500, "taps": 0,
-                 "total_installs": 0, "local_spend": "25.0"},
+                {
+                    "date": "2026-07-01",
+                    "campaign_id": 1,
+                    "campaign_name": "One",
+                    "app_name": "App A",
+                    "impressions": 1000,
+                    "taps": 100,
+                    "total_installs": 10,
+                    "local_spend": "50.0",
+                },
+                {
+                    "date": "2026-07-02",
+                    "campaign_id": 1,
+                    "campaign_name": "One",
+                    "app_name": "App A",
+                    "impressions": 1000,
+                    "taps": 100,
+                    "total_installs": 10,
+                    "local_spend": "50.0",
+                },
+                {
+                    "date": "2026-07-01",
+                    "campaign_id": 2,
+                    "campaign_name": "Two",
+                    "app_name": "App B",
+                    "impressions": 500,
+                    "taps": 0,
+                    "total_installs": 0,
+                    "local_spend": "25.0",
+                },
             ]
         )
     )
@@ -151,12 +172,26 @@ class TestSummaryTables:
             normalize(
                 pd.DataFrame(
                     [
-                        {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 11,
-                         "keyword": "good", "impressions": 100, "taps": 10,
-                         "total_installs": 5, "local_spend": "10"},
-                        {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 12,
-                         "keyword": "bad", "impressions": 100, "taps": 10,
-                         "total_installs": 0, "local_spend": "30"},
+                        {
+                            "campaign_id": 1,
+                            "ad_group_id": 1,
+                            "keyword_id": 11,
+                            "keyword": "good",
+                            "impressions": 100,
+                            "taps": 10,
+                            "total_installs": 5,
+                            "local_spend": "10",
+                        },
+                        {
+                            "campaign_id": 1,
+                            "ad_group_id": 1,
+                            "keyword_id": 12,
+                            "keyword": "bad",
+                            "impressions": 100,
+                            "taps": 10,
+                            "total_installs": 0,
+                            "local_spend": "30",
+                        },
                     ]
                 )
             ),
