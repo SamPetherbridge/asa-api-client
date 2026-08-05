@@ -332,7 +332,7 @@ def _write_summary(
         chart.set_legend({"position": "bottom"})
         ws.insert_chart(7, 0, chart, {"x_scale": 1.8, "y_scale": 1.1})
 
-    row = 23
+    row = 25  # clear of the chart, which spans roughly rows 8-24
     ws.write_string(row, 0, "Top 5 keywords by installs", fmts["callout_header"])
     top_last = _write_table(
         ws, summary.top_keywords, _CALLOUT_SPEC, fmts,
