@@ -187,7 +187,7 @@ pip install "asa-api-client[cli]"
 asa analyze --period 90d --output report.xlsx
 ```
 
-The workbook includes a summary sheet with KPIs and trends, formatted analysis sheets per reporting level, and raw daily data for pivoting. For details, see the [CLI guide](https://asa-api-client.peth.au/user-guide/cli/).
+The workbook includes a summary sheet with KPIs and trends, formatted analysis sheets per reporting level, and raw daily data for pivoting. For details, see the [CLI guide](https://asa-api-client.peth.au/guide/cli/).
 
 ## License
 
