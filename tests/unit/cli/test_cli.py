@@ -95,3 +95,14 @@ class TestAnalyzeCommand:
         result = runner.invoke(app, ["analyze"])
         assert result.exit_code == 1
         assert result.exception is None or isinstance(result.exception, SystemExit)
+
+    @pytest.mark.usefixtures("asa_env")
+    def test_unwritable_output_clean_error(
+        self, httpx_mock: HTTPXMock, tmp_path: Path
+    ) -> None:
+        """A bad --output path fails cleanly, not with a raw traceback."""
+        _mock_api(httpx_mock)
+        out = tmp_path / "does-not-exist" / "report.xlsx"
+        result = runner.invoke(app, ["analyze", "--output", str(out)])
+        assert result.exit_code == 1
+        assert result.exception is None or isinstance(result.exception, SystemExit)

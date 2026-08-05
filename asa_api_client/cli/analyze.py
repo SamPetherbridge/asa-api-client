@@ -10,6 +10,7 @@ import pandas as pd
 import typer
 from rich.console import Console
 from rich.progress import BarColumn, Progress, TaskID, TextColumn
+from xlsxwriter.exceptions import XlsxWriterException
 
 from asa_api_client.cli import dates, fetch, metrics
 from asa_api_client.cli.workbook import SummaryData, write_workbook
@@ -186,10 +187,13 @@ def analyze(
 
     out_path = output or Path(f"asa-analysis-{file_scope}-{today:%Y-%m-%d}.xlsx")
     notes = {key: lv.notes for key, lv in result.levels.items()}
-    write_workbook(
-        out_path, summary=summary, analysis=analysis, daily=daily_frames,
-        notes=notes, currency_format=fmt,
-    )
+    try:
+        write_workbook(
+            out_path, summary=summary, analysis=analysis, daily=daily_frames,
+            notes=notes, currency_format=fmt,
+        )
+    except (OSError, XlsxWriterException) as exc:
+        raise _fail(f"Could not write {out_path}: {exc}") from exc
 
     symbol = _currency_symbol(fmt)
     spend = current_kpis["spend"]
