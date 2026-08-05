@@ -314,6 +314,11 @@ async def fetch_all(
             "Search terms are only available for the trailing 90 days; "
             f"this sheet covers {st_start}-{end}.",
         )
+    if not st_out_of_range and timezone.upper() == "UTC":
+        notes["search_terms"].append(
+            "Search-term rows use the org's reporting timezone; "
+            "the API does not support UTC at this level."
+        )
 
     levels: dict[str, LevelData] = {}
     for key, label in LEVELS:

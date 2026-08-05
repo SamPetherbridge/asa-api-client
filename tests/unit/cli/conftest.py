@@ -1,5 +1,6 @@
 """Shared fixtures for CLI tests: env credentials and report JSON builders."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,8 +12,13 @@ API = "https://api.searchads.apple.com/api/v5"
 
 
 @pytest.fixture
-def asa_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point the client at fake credentials with a real EC P-256 key."""
+def asa_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Point the client at fake credentials with a real EC P-256 key.
+
+    Also chdirs to a temp directory so a real ``.env`` in the repo root
+    can never leak into tests that call ``from_env()`` with defaults.
+    """
+    monkeypatch.chdir(tmp_path)
     key = ec.generate_private_key(ec.SECP256R1())
     pem = key.private_bytes(
         encoding=serialization.Encoding.PEM,

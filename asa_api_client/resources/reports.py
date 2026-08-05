@@ -406,6 +406,45 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
         data = await self._request_async("POST", f"campaigns/{campaign_id}/keywords", json=request)
         return self._parse_report_response(data)
 
+    def _build_search_terms_request(
+        self,
+        start_date: date,
+        end_date: date,
+        *,
+        granularity: GranularityType,
+        selector: dict[str, Any] | None = None,
+        timezone: str = "UTC",
+    ) -> dict[str, Any]:
+        """Build a search-term report payload honoring endpoint quirks.
+
+        The search-terms endpoint rejects row/grand totals combined with
+        granularity, and rejects ``timeZone: "UTC"`` outright, so totals
+        are disabled and a UTC timezone is omitted from the payload (the
+        API then reports in the org's timezone).
+
+        Args:
+            start_date: Report start date.
+            end_date: Report end date.
+            granularity: Time granularity for the report.
+            selector: Optional selector for filtering.
+            timezone: Requested timezone; ``"UTC"`` is dropped (see above).
+
+        Returns:
+            The search-term report request payload.
+        """
+        request = self._build_report_request(
+            start_date,
+            end_date,
+            granularity=granularity,
+            selector=selector,
+            return_grand_totals=False,
+            return_row_totals=False,
+            timezone=timezone,
+        )
+        if request.get("timeZone") == "UTC":
+            del request["timeZone"]
+        return request
+
     def search_terms(
         self,
         campaign_id: int,
@@ -420,6 +459,11 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
 
         Search term reports show which actual search queries triggered
         your ads and their performance.
+
+        Note:
+            The search-terms endpoint does not accept ``timeZone: "UTC"``;
+            when ``timezone`` is ``"UTC"`` the field is omitted and the API
+            reports in the org's timezone.
 
         Args:
             campaign_id: The campaign ID to report on.
@@ -444,7 +488,7 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
                 ]
             }
 
-        request = self._build_report_request(
+        request = self._build_search_terms_request(
             start_date,
             end_date,
             granularity=granularity,
@@ -490,7 +534,7 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
                 ]
             }
 
-        request = self._build_report_request(
+        request = self._build_search_terms_request(
             start_date,
             end_date,
             granularity=granularity,
@@ -606,7 +650,7 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
         Returns:
             The search term report for the specified ad group.
         """
-        request = self._build_report_request(
+        request = self._build_search_terms_request(
             start_date,
             end_date,
             granularity=granularity,
@@ -643,7 +687,7 @@ class ReportResource(BaseResource[ReportingResponse, ReportingRequest, Reporting
         Returns:
             The search term report for the specified ad group.
         """
-        request = self._build_report_request(
+        request = self._build_search_terms_request(
             start_date,
             end_date,
             granularity=granularity,

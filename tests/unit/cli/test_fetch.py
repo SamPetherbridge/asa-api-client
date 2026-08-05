@@ -325,3 +325,40 @@ class TestFetchAll:
         assert not httpx_mock.get_requests(
             url=re.compile(rf"{API}/reports/campaigns/\d+/searchterms")
         )
+
+
+@pytest.mark.usefixtures("asa_env")
+class TestSearchTermRequestPayload:
+    """The search-terms endpoint rejects UTC timeZone and totals-with-granularity."""
+
+    def _searchterm_body(self, httpx_mock: HTTPXMock) -> dict[str, object]:
+        request = next(r for r in httpx_mock.get_requests() if "searchterms" in str(r.url))
+        body: dict[str, object] = json.loads(request.content)
+        return body
+
+    def test_utc_timezone_dropped_and_totals_disabled(self, httpx_mock: HTTPXMock) -> None:
+        """A UTC request omits timeZone and disables row/grand totals."""
+        httpx_mock.add_response(url=TOKEN_URL, json=token_json(), is_reusable=True)
+        httpx_mock.add_response(url=f"{API}/reports/campaigns/1/searchterms", json=report_json([]))
+        client = _client()
+        try:
+            client.reports.search_terms(1, date(2026, 7, 1), date(2026, 7, 2))
+        finally:
+            client.close()
+        body = self._searchterm_body(httpx_mock)
+        assert "timeZone" not in body
+        assert body["returnRowTotals"] is False
+        assert body["returnGrandTotals"] is False
+
+    def test_non_utc_timezone_passed_through(self, httpx_mock: HTTPXMock) -> None:
+        """A non-UTC timezone (ORTZ) is still sent to the API."""
+        httpx_mock.add_response(url=TOKEN_URL, json=token_json(), is_reusable=True)
+        httpx_mock.add_response(url=f"{API}/reports/campaigns/1/searchterms", json=report_json([]))
+        client = _client()
+        try:
+            client.reports.search_terms(1, date(2026, 7, 1), date(2026, 7, 2), timezone="ORTZ")
+        finally:
+            client.close()
+        body = self._searchterm_body(httpx_mock)
+        assert body["timeZone"] == "ORTZ"
+        assert body["returnRowTotals"] is False

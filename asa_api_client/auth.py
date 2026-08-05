@@ -446,11 +446,15 @@ class Authenticator:
             errors = e.errors()
             if errors:
                 first_error = errors[0]
-                field = first_error.get("loc", ["unknown"])[0]
+                # Model-level validators (e.g. the private-key source check)
+                # report an empty loc tuple.
+                loc = first_error.get("loc") or ()
                 msg = first_error.get("msg", "validation error")
-                raise ConfigurationError(
-                    f"Configuration error for ASA_{str(field).upper()}: {msg}"
-                ) from e
+                if loc:
+                    raise ConfigurationError(
+                        f"Configuration error for ASA_{str(loc[0]).upper()}: {msg}"
+                    ) from e
+                raise ConfigurationError(f"Configuration error: {msg}") from e
             raise ConfigurationError(f"Configuration error: {e}") from e
 
         return cls(
