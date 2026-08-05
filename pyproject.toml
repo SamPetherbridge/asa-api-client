@@ -101,6 +101,10 @@ warn_no_return = true
 follow_imports = "silent"
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = "xlsxwriter.*"
+ignore_missing_imports = true
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
