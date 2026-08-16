@@ -97,7 +97,17 @@ class InsightResource(
 
         Calls ``POST /v1/insights/apps/search-term-popularity/query``
         for relative search-volume rankings per App Store genre and
-        country/region. Metric columns (``rankInGenre``,
+        country/region.
+
+        Note:
+            Although the docs describe ``filters`` support, the live API
+            has been observed (2026-08-16) to return zero rows whenever
+            any filter is present — query unfiltered and filter
+            client-side on ``country_or_region``/``genre``. Data for a
+            week is published with a lag: the most recently completed
+            Sun-Sat week may be empty until later in the following week.
+
+        Metric columns (``rankInGenre``,
         ``searchPopularityInGenre``, ``searchPopularity1to100``,
         ``searchPopularity1to5``) are returned only when named in the
         request's ``fields`` list.
