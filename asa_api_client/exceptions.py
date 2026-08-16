@@ -219,3 +219,36 @@ class ConfigurationError(AppleSearchAdsError):
     - Invalid private key format
     - Invalid org_id
     """
+
+
+class PartialFailureError(AppleSearchAdsError):
+    """Raised when the API reports errors inside a successful HTTP response.
+
+    The Apple Ads Platform API v1 can return HTTP 2xx with an ``error``
+    block describing request-level or per-item failures (e.g. in bulk
+    operations). This exception surfaces those instead of silently
+    reporting success.
+
+    Attributes:
+        details: The ``error.details`` list from the response, where each
+            entry has ``code``, ``message``, and ``info`` keys.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        response_body: dict[str, Any] | None = None,
+        details: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Initialize the exception.
+
+        Args:
+            message: Human-readable error message.
+            status_code: HTTP status code from the API response.
+            response_body: Raw response body from the API.
+            details: The ``error.details`` list from the response.
+        """
+        super().__init__(message, status_code=status_code, response_body=response_body)
+        self.details = details or []
