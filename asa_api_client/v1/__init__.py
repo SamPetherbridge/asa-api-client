@@ -9,3 +9,8 @@ Import the client from the package root::
 
     from asa_api_client import AppleAdsClient
 """
+
+from asa_api_client.v1.client import AppleAdsClient
+from asa_api_client.v1.query import FilterOperator, Query, SortOrder
+
+__all__ = ["AppleAdsClient", "FilterOperator", "Query", "SortOrder"]

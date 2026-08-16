@@ -29,18 +29,22 @@ from asa_api_client.exceptions import (
     AuthenticationError,
     ConfigurationError,
     NotFoundError,
+    PartialFailureError,
     RateLimitError,
     ValidationError,
 )
 from asa_api_client.logging import configure_logging
 from asa_api_client.settings import Settings
+from asa_api_client.v1.client import AppleAdsClient
 
 __all__ = [
+    "AppleAdsClient",
     "AppleSearchAdsClient",
     "AppleSearchAdsError",
     "AuthenticationError",
     "ConfigurationError",
     "NotFoundError",
+    "PartialFailureError",
     "RateLimitError",
     "Settings",
     "ValidationError",
