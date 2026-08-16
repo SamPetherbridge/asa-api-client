@@ -1,5 +1,7 @@
 """Tests for the AppleAdsClient."""
 
+from typing import ClassVar
+
 import pytest
 
 from asa_api_client.v1.client import DEFAULT_V1_BASE_URL, AppleAdsClient
@@ -88,6 +90,53 @@ class TestFromEnv:
 
         client = AppleAdsClient.from_env(env_file=None)
         assert client.ad_account_id is None
+
+
+class TestResourceWiring:
+    """Tests that every v1 resource is reachable from the client."""
+
+    EXPECTED: ClassVar[dict[str, str]] = {
+        "campaigns": "CampaignResource",
+        "ad_accounts": "AdAccountResource",
+        "acls": "AclResource",
+        "orgs": "OrgResource",
+        "advertiser_resources": "AdvertiserResourceResource",
+        "ad_groups": "AdGroupResource",
+        "keywords": "KeywordResource",
+        "negative_keywords": "NegativeKeywordResource",
+        "ads": "AdResource",
+        "creatives": "CreativeResource",
+        "assets": "AssetResource",
+        "product_pages": "ProductPageResource",
+        "budget_orders": "BudgetOrderResource",
+        "apps": "AppResource",
+        "geo": "GeoResource",
+        "brands": "BrandResource",
+        "business_categories": "BusinessCategoryResource",
+        "brand_rejection_reasons": "BrandRejectionReasonResource",
+        "locations": "LocationResource",
+        "location_groups": "LocationGroupResource",
+        "reports": "ReportResource",
+        "brand_reports": "BrandReportResource",
+        "insights": "InsightResource",
+        "suggestions": "SuggestionResource",
+        "recommendations": "RecommendationResource",
+        "change_history": "ChangeHistoryResource",
+        "bulk": "BulkOperationResource",
+    }
+
+    def test_every_property_returns_its_resource(self, ec_private_key_pem: str) -> None:
+        """Test each documented property yields the right resource class."""
+        client = make_client(ec_private_key_pem)
+        for prop, class_name in self.EXPECTED.items():
+            resource = getattr(client, prop)
+            assert type(resource).__name__ == class_name, prop
+
+    def test_resources_are_cached(self, ec_private_key_pem: str) -> None:
+        """Test repeated property access returns the same instance."""
+        client = make_client(ec_private_key_pem)
+        assert client.campaigns is client.campaigns
+        assert client.reports is client.reports
 
 
 class TestLifecycle:

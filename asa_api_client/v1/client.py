@@ -20,6 +20,34 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from asa_api_client.auth import Authenticator
 from asa_api_client.exceptions import ConfigurationError
 from asa_api_client.logging import get_logger
+from asa_api_client.v1.resources.ad_accounts import (
+    AclResource,
+    AdAccountResource,
+    AdvertiserResourceResource,
+    OrgResource,
+)
+from asa_api_client.v1.resources.ad_groups import AdGroupResource
+from asa_api_client.v1.resources.ads import AdResource
+from asa_api_client.v1.resources.apps import AppResource
+from asa_api_client.v1.resources.brands import (
+    BrandRejectionReasonResource,
+    BrandResource,
+    BusinessCategoryResource,
+    LocationGroupResource,
+    LocationResource,
+)
+from asa_api_client.v1.resources.budget_orders import BudgetOrderResource
+from asa_api_client.v1.resources.bulk import BulkOperationResource
+from asa_api_client.v1.resources.campaigns import CampaignResource
+from asa_api_client.v1.resources.change_history import ChangeHistoryResource
+from asa_api_client.v1.resources.creatives import AssetResource, CreativeResource
+from asa_api_client.v1.resources.geo import GeoResource
+from asa_api_client.v1.resources.insights import InsightResource
+from asa_api_client.v1.resources.keywords import KeywordResource, NegativeKeywordResource
+from asa_api_client.v1.resources.product_pages import ProductPageResource
+from asa_api_client.v1.resources.recommendations import RecommendationResource
+from asa_api_client.v1.resources.reports import BrandReportResource, ReportResource
+from asa_api_client.v1.resources.suggestions import SuggestionResource
 
 logger = get_logger(__name__)
 
@@ -143,6 +171,35 @@ class AppleAdsClient:
         self._http_client: httpx.Client | None = None
         self._async_http_client: httpx.AsyncClient | None = None
 
+        # Initialize resources
+        self._campaigns = CampaignResource(self)
+        self._ad_accounts = AdAccountResource(self)
+        self._acls = AclResource(self)
+        self._orgs = OrgResource(self)
+        self._advertiser_resources = AdvertiserResourceResource(self)
+        self._ad_groups = AdGroupResource(self)
+        self._keywords = KeywordResource(self)
+        self._negative_keywords = NegativeKeywordResource(self)
+        self._ads = AdResource(self)
+        self._creatives = CreativeResource(self)
+        self._assets = AssetResource(self)
+        self._product_pages = ProductPageResource(self)
+        self._budget_orders = BudgetOrderResource(self)
+        self._apps = AppResource(self)
+        self._geo = GeoResource(self)
+        self._brands = BrandResource(self)
+        self._business_categories = BusinessCategoryResource(self)
+        self._brand_rejection_reasons = BrandRejectionReasonResource(self)
+        self._locations = LocationResource(self)
+        self._location_groups = LocationGroupResource(self)
+        self._reports = ReportResource(self)
+        self._brand_reports = BrandReportResource(self)
+        self._insights = InsightResource(self)
+        self._suggestions = SuggestionResource(self)
+        self._recommendations = RecommendationResource(self)
+        self._change_history = ChangeHistoryResource(self)
+        self._bulk = BulkOperationResource(self)
+
         logger.info(
             "AppleAdsClient initialized for ad_account_id=%s, base_url=%s",
             self.ad_account_id,
@@ -209,6 +266,163 @@ class AppleAdsClient:
             base_url=base_url,
             timeout=timeout,
         )
+
+    @property
+    def campaigns(self) -> CampaignResource:
+        """Campaigns resource (App Store and Apple Maps campaigns).
+
+        Example:
+            List enabled campaigns::
+
+                from asa_api_client.v1 import Query
+
+                page = client.campaigns.query(
+                    Query().where("status", "EQUALS", "ENABLED")
+                )
+        """
+        return self._campaigns
+
+    @property
+    def ad_accounts(self) -> AdAccountResource:
+        """Ad accounts resource; also carries ``me()`` for the current user."""
+        return self._ad_accounts
+
+    @property
+    def acls(self) -> AclResource:
+        """User ACLs resource — enumerates accessible ad accounts."""
+        return self._acls
+
+    @property
+    def orgs(self) -> OrgResource:
+        """Organizations resource (v5-compatible org lookups)."""
+        return self._orgs
+
+    @property
+    def advertiser_resources(self) -> AdvertiserResourceResource:
+        """Advertiser resources (delegations) resource."""
+        return self._advertiser_resources
+
+    @property
+    def ad_groups(self) -> AdGroupResource:
+        """Ad groups resource."""
+        return self._ad_groups
+
+    @property
+    def keywords(self) -> KeywordResource:
+        """Targeting keywords resource."""
+        return self._keywords
+
+    @property
+    def negative_keywords(self) -> NegativeKeywordResource:
+        """Negative keywords resource."""
+        return self._negative_keywords
+
+    @property
+    def ads(self) -> AdResource:
+        """Ads resource."""
+        return self._ads
+
+    @property
+    def creatives(self) -> CreativeResource:
+        """Ad creatives resource."""
+        return self._creatives
+
+    @property
+    def assets(self) -> AssetResource:
+        """Creative assets resource (upload, query)."""
+        return self._assets
+
+    @property
+    def product_pages(self) -> ProductPageResource:
+        """Custom product pages resource (read-only)."""
+        return self._product_pages
+
+    @property
+    def budget_orders(self) -> BudgetOrderResource:
+        """Shared budgets (budget orders) resource."""
+        return self._budget_orders
+
+    @property
+    def apps(self) -> AppResource:
+        """App search, details, eligibility, and rejection reasons."""
+        return self._apps
+
+    @property
+    def geo(self) -> GeoResource:
+        """Geo targeting search resource."""
+        return self._geo
+
+    @property
+    def brands(self) -> BrandResource:
+        """Apple Maps ads brands resource."""
+        return self._brands
+
+    @property
+    def business_categories(self) -> BusinessCategoryResource:
+        """Apple Maps ads business categories resource."""
+        return self._business_categories
+
+    @property
+    def brand_rejection_reasons(self) -> BrandRejectionReasonResource:
+        """Apple Maps ads brand rejection reasons resource."""
+        return self._brand_rejection_reasons
+
+    @property
+    def locations(self) -> LocationResource:
+        """Apple Maps ads locations resource."""
+        return self._locations
+
+    @property
+    def location_groups(self) -> LocationGroupResource:
+        """Apple Maps ads location groups resource."""
+        return self._location_groups
+
+    @property
+    def reports(self) -> ReportResource:
+        """App Store campaign reports (all levels).
+
+        Example:
+            Campaign-level report::
+
+                report = client.reports.campaigns(request)
+        """
+        return self._reports
+
+    @property
+    def brand_reports(self) -> BrandReportResource:
+        """Apple Maps ads (business brands) reports."""
+        return self._brand_reports
+
+    @property
+    def insights(self) -> InsightResource:
+        """Insights: impression share and search term popularity.
+
+        Example:
+            Search term popularity::
+
+                rows = client.insights.query_search_term_popularity(request)
+        """
+        return self._insights
+
+    @property
+    def suggestions(self) -> SuggestionResource:
+        """Keyword/phrase/category and target-CPA suggestions."""
+        return self._suggestions
+
+    @property
+    def recommendations(self) -> RecommendationResource:
+        """Target-CPA and daily-budget recommendations (query/apply/dismiss)."""
+        return self._recommendations
+
+    @property
+    def change_history(self) -> ChangeHistoryResource:
+        """Change history (audit) resource."""
+        return self._change_history
+
+    @property
+    def bulk(self) -> BulkOperationResource:
+        """Bulk operations for keywords and negative keywords."""
+        return self._bulk
 
     def _get_http_client(self) -> httpx.Client:
         """Get or create the synchronous HTTP client.
