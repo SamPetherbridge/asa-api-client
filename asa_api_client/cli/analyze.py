@@ -13,9 +13,11 @@ from rich.progress import BarColumn, Progress, TaskID, TextColumn
 from xlsxwriter.exceptions import XlsxWriterException
 
 from asa_api_client.cli import dates, fetch, metrics
+from asa_api_client.cli.v1_adapter import V1FetchAdapter
 from asa_api_client.cli.workbook import SummaryData, write_workbook
 from asa_api_client.client import AppleSearchAdsClient
 from asa_api_client.exceptions import AppleSearchAdsError, ConfigurationError
+from asa_api_client.v1.client import AppleAdsClient
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 _err = Console(stderr=True)
@@ -32,6 +34,13 @@ class Period(StrEnum):
     D30 = "30d"
     D90 = "90d"
     D365 = "365d"
+
+
+class ApiVersion(StrEnum):
+    """Selectable Apple Ads API backends."""
+
+    V5 = "v5"
+    V1 = "v1"
 
 
 _CURRENCY_FORMATS = {
@@ -65,7 +74,7 @@ def _fail(message: str) -> "typer.Exit":
 
 
 async def _fetch(
-    client: AppleSearchAdsClient,
+    client: fetch.FetchClient,
     meta: pd.DataFrame,
     start: date,
     end: date,
@@ -119,6 +128,10 @@ def analyze(
         str | None,
         typer.Option("--currency-format", help="Excel number format for money."),
     ] = None,
+    api_version: Annotated[
+        ApiVersion,
+        typer.Option("--api-version", help="Apple Ads API version to fetch with."),
+    ] = ApiVersion.V5,
 ) -> None:
     """Generate an Excel performance analysis workbook."""
     today = datetime.now(tz=UTC).date()
@@ -132,8 +145,12 @@ def analyze(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
+    client: AppleSearchAdsClient | V1FetchAdapter
     try:
-        client = AppleSearchAdsClient.from_env()
+        if api_version is ApiVersion.V1:
+            client = V1FetchAdapter(AppleAdsClient.from_env())
+        else:
+            client = AppleSearchAdsClient.from_env()
     except ConfigurationError as exc:
         raise _fail(str(exc)) from exc
 

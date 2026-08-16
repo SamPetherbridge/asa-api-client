@@ -6,10 +6,10 @@ and flattening API responses into daily DataFrames.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 import pandas as pd
 
@@ -17,8 +17,141 @@ from asa_api_client.cli.dates import SEARCH_TERM_LOOKBACK, chunk_windows, prior_
 from asa_api_client.exceptions import AppleSearchAdsError
 from asa_api_client.models.reports import ReportingResponse
 
-if TYPE_CHECKING:
-    from asa_api_client.client import AppleSearchAdsClient
+
+class MoneyLike(Protocol):
+    """Anything money-shaped with a currency code."""
+
+    @property
+    def currency(self) -> str:
+        """ISO currency code."""
+        ...
+
+
+class AppListing(Protocol):
+    """One app search result."""
+
+    @property
+    def adam_id(self) -> int | None:
+        """The App Store app ID."""
+        ...
+
+    @property
+    def app_name(self) -> str | None:
+        """The app display name."""
+        ...
+
+
+class CampaignListing(Protocol):
+    """One campaign from the scope listing."""
+
+    @property
+    def id(self) -> int | None:
+        """The campaign ID."""
+        ...
+
+    @property
+    def name(self) -> str | None:
+        """The campaign name."""
+        ...
+
+    @property
+    def adam_id(self) -> int:
+        """The promoted app's adam ID."""
+        ...
+
+    @property
+    def daily_budget_amount(self) -> MoneyLike | None:
+        """The daily budget, if set."""
+        ...
+
+    @property
+    def budget_amount(self) -> MoneyLike | None:
+        """The lifetime budget, if set."""
+        ...
+
+
+class FetchApps(Protocol):
+    """The app-search surface the fetch pipeline uses."""
+
+    def search(self, *, query: str, return_own_apps: bool) -> Iterable[AppListing]:
+        """Search apps eligible for (or owned by) the organization."""
+        ...
+
+
+class FetchCampaigns(Protocol):
+    """The campaign-listing surface the fetch pipeline uses."""
+
+    def list(self) -> Iterable[CampaignListing]:
+        """List the organization's campaigns."""
+        ...
+
+
+class FetchReports(Protocol):
+    """The async report surface the fetch pipeline uses."""
+
+    async def campaigns_async(
+        self,
+        start_date: date,
+        end_date: date,
+        /,
+        *,
+        campaign_ids: list[int] | None,
+        timezone: str,
+    ) -> ReportingResponse:
+        """Campaign-level daily report."""
+        ...
+
+    async def ad_groups_async(
+        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
+    ) -> ReportingResponse:
+        """Ad-group-level daily report for one campaign."""
+        ...
+
+    async def keywords_async(
+        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
+    ) -> ReportingResponse:
+        """Keyword-level daily report for one campaign."""
+        ...
+
+    async def search_terms_async(
+        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
+    ) -> ReportingResponse:
+        """Search-term-level daily report for one campaign."""
+        ...
+
+    async def ads_async(
+        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
+    ) -> ReportingResponse:
+        """Ad-level daily report for one campaign."""
+        ...
+
+
+class FetchClient(Protocol):
+    """The narrow client surface the fetch pipeline needs.
+
+    Satisfied structurally by the v5 ``AppleSearchAdsClient`` and by
+    ``cli.v1_adapter.V1FetchAdapter``.
+    """
+
+    @property
+    def apps(self) -> FetchApps:
+        """App search resource."""
+        ...
+
+    @property
+    def campaigns(self) -> FetchCampaigns:
+        """Campaigns resource."""
+        ...
+
+    @property
+    def reports(self) -> FetchReports:
+        """Reports resource."""
+        ...
+
+    async def aclose(self) -> None:
+        """Close async HTTP resources."""
+        ...
+
 
 LEVELS: list[tuple[str, str]] = [
     ("campaigns", "Campaigns"),
@@ -92,7 +225,7 @@ def flatten_daily(resp: ReportingResponse) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def _app_names(client: "AppleSearchAdsClient", adam_ids: list[int]) -> dict[int, str]:
+def _app_names(client: FetchClient, adam_ids: list[int]) -> dict[int, str]:
     """Best-effort lookup of app names for the org's adam IDs.
 
     Falls back to ``App <adam_id>`` labels when the search endpoint
@@ -116,7 +249,7 @@ def _app_names(client: "AppleSearchAdsClient", adam_ids: list[int]) -> dict[int,
 
 
 def resolve_scope(
-    client: "AppleSearchAdsClient", app_ids: list[int] | None
+    client: FetchClient, app_ids: list[int] | None
 ) -> tuple[pd.DataFrame, str | None]:
     """List campaigns once and build the campaign → app scope map.
 
@@ -170,7 +303,7 @@ def _merge_names(df: pd.DataFrame, meta: pd.DataFrame) -> pd.DataFrame:
 
 
 async def fetch_all(
-    client: "AppleSearchAdsClient",
+    client: FetchClient,
     meta: pd.DataFrame,
     start: date,
     end: date,
