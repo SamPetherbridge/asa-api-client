@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, TaskID, TextColumn
 from xlsxwriter.exceptions import XlsxWriterException
 
-from asa_api_client.cli import dates, fetch, metrics
+from asa_api_client.cli import dates, fetch, metrics, v1_smoke
 from asa_api_client.cli.v1_adapter import V1FetchAdapter
 from asa_api_client.cli.workbook import SummaryData, write_workbook
 from asa_api_client.client import AppleSearchAdsClient
@@ -20,6 +20,7 @@ from asa_api_client.exceptions import AppleSearchAdsError, ConfigurationError
 from asa_api_client.v1.client import AppleAdsClient
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+app.command("v1-smoke")(v1_smoke.command)
 _err = Console(stderr=True)
 
 
