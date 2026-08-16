@@ -304,10 +304,15 @@ def _popularity_count(client: AppleAdsClient, start: date, end: date) -> int:
     Returns:
         The number of popularity rows returned.
     """
+    # Weekly popularity windows must start on a Sunday; align the
+    # requested window to the last complete Sun-Sat week before it.
+    del start  # the aligned week is derived from the window end alone
+    last_saturday = end - timedelta(days=(end.weekday() + 2) % 7 or 7)
+    last_sunday = last_saturday - timedelta(days=6)
     request = SearchTermPopularityQueryRequest(
         time_range=SearchTermPopularityTimeRange(
-            start=start,
-            end=end,
+            start=last_sunday,
+            end=last_saturday,
             granularity=SearchTermPopularityGranularity.WEEKLY_SUN_SAT,
         )
     )
@@ -325,8 +330,10 @@ def _change_history_count(client: AppleAdsClient, start: date, end: date) -> int
     Returns:
         The number of audit summary rows returned.
     """
+    # The live API requires an entityType filter on change-history queries.
     query = (
         Query()
+        .where("entityType", "IN", ["Campaign"])
         .where("eventTime", "BETWEEN", [f"{start}T00:00:00", f"{end}T23:59:59"])
         .page(size=10)
     )

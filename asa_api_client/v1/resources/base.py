@@ -125,24 +125,27 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
     def _context_header(self) -> dict[str, str]:
         """Build the X-AP-Context header, validating configuration.
 
+        Context-free endpoints never send the header — the live API
+        rejects requests to them (403) when it is present.
+
         Returns:
             A dict with the context header, or empty when the resource
-            is context-free and no account is configured.
+            is context-free.
 
         Raises:
             ConfigurationError: If the resource requires account context
                 but the client has no ad_account_id.
         """
+        if not self.requires_account_context:
+            return {}
         ad_account_id = self._client.ad_account_id
-        if ad_account_id is not None:
-            return {"X-AP-Context": f"adAccountId={ad_account_id}"}
-        if self.requires_account_context:
+        if ad_account_id is None:
             raise ConfigurationError(
                 "ad_account_id is required for this endpoint. Set it on the "
                 "client (or ASA_AD_ACCOUNT_ID in the environment); use "
                 "client.ad_accounts to discover available accounts."
             )
-        return {}
+        return {"X-AP-Context": f"adAccountId={ad_account_id}"}
 
     def _get_headers(self) -> dict[str, str]:
         """Get headers for API requests.

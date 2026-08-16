@@ -117,11 +117,11 @@ class TestHeaders:
         ContextFreeResource(make_client(ad_account_id=None)).get(1)
         assert "X-AP-Context" not in httpx_mock.get_requests()[0].headers
 
-    def test_context_free_resource_sends_header_when_set(self, httpx_mock: HTTPXMock) -> None:
-        """Test context-free resources still send the header when available."""
+    def test_context_free_resource_omits_header_even_when_set(self, httpx_mock: HTTPXMock) -> None:
+        """Test context-free endpoints never send the header (live API 403s on it)."""
         httpx_mock.add_response(url=f"{BASE_URL}/dummies/1", json={"result": {"id": 1}})
         ContextFreeResource(make_client()).get(1)
-        assert httpx_mock.get_requests()[0].headers["X-AP-Context"] == "adAccountId=12345"
+        assert "X-AP-Context" not in httpx_mock.get_requests()[0].headers
 
 
 class TestEnvelope:
