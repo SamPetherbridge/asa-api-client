@@ -136,7 +136,7 @@ class TestReportsShim:
 
         assert isinstance(response, ReportingResponse)
         body = json.loads(httpx_mock.get_requests(url=re.compile(r".*campaigns/query"))[0].content)
-        assert body["filters"] == [{"field": "campaignId", "operator": "IN", "value": ["1", "2"]}]
+        assert body["filters"] == [{"field": "id", "operator": "IN", "value": ["1", "2"]}]
         assert body["timeRange"] == {
             "start": "2026-08-01",
             "end": "2026-08-02",

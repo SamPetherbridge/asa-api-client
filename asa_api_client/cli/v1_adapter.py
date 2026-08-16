@@ -437,9 +437,12 @@ class _ReportsShim:
         """
         filters = None
         if campaign_ids:
+            # The campaign-level report rejects "campaignId" (live
+            # VALIDATION_ERROR): the campaign is the row entity, so the
+            # filter field is "id". Sub-level reports keep "campaignId".
             filters = [
                 ReportFilter(
-                    field="campaignId",
+                    field="id",
                     operator=ReportFilterOperator.IN,
                     value=[str(cid) for cid in campaign_ids],
                 )

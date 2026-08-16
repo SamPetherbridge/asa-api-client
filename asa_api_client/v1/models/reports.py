@@ -189,9 +189,14 @@ class ReportingCreativeSystemStatus(StrEnum):
 
 
 class ReportingKeywordStatus(StrEnum):
-    """Status of a keyword in a report row."""
+    """Status of a keyword in a report row.
+
+    The docs list ``ACTIVE``/``PAUSED``/``DELETED`` but the live API
+    returns ``ENABLED`` (observed 2026-08-16); both sets are accepted.
+    """
 
     ACTIVE = "ACTIVE"
+    ENABLED = "ENABLED"
     PAUSED = "PAUSED"
     DELETED = "DELETED"
 
