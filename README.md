@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/github/license/SamPetherbridge/asa-api-client.svg)](https://github.com/SamPetherbridge/asa-api-client/blob/main/LICENSE)
 [![CI](https://github.com/SamPetherbridge/asa-api-client/actions/workflows/ci.yml/badge.svg)](https://github.com/SamPetherbridge/asa-api-client/actions/workflows/ci.yml)
 
-A modern, fully-typed Python client for the Apple Search Ads API with async support and Pydantic models.
+A modern, fully-typed Python client for the Apple Ads APIs with async support and Pydantic models — covering both the new **Apple Ads Platform API v1** and the legacy Campaign Management API v5 (sunset January 26, 2027).
 
 ## Features
 
@@ -62,6 +62,35 @@ with client:
         print(f"{campaign.name}: {campaign.status}")
 ```
 
+## Platform API v1
+
+Apple's new [Platform API v1](https://developer.apple.com/documentation/apple-ads-platform-api) replaces v5 (which stops working on **2027-01-26**). The v1 client ships alongside the v5 client with the same credentials — just add your ad account ID:
+
+```python
+from asa_api_client import AppleAdsClient
+from asa_api_client.v1 import Query
+
+client = AppleAdsClient.from_env()  # reads ASA_* plus ASA_AD_ACCOUNT_ID
+
+with client:
+    # Flat query-based API with typed filters
+    enabled = client.campaigns.query(Query().where("status", "EQUALS", "ENABLED"))
+
+    # v1-only features
+    recs = client.recommendations
+    popularity = client.insights
+    history = client.change_history
+    bulk = client.bulk
+```
+
+Don't know your ad account ID? Run the read-only smoke check — it discovers accounts and validates the whole integration against the live API:
+
+```bash
+asa v1-smoke
+```
+
+See the [Platform API v1 guide](https://asa-api-client.peth.au/guide/platform-api-v1/) for the full migration crib and resource reference. Import v1 symbols from the package root (`AppleAdsClient`) — internal layout may change when v5 is removed.
+
 ## Environment Variables
 
 ```bash
@@ -70,6 +99,7 @@ export ASA_TEAM_ID="SEARCHADS.your-team-id"
 export ASA_KEY_ID="your-key-id"
 export ASA_ORG_ID="123456"
 export ASA_PRIVATE_KEY_PATH="/path/to/private-key.pem"
+export ASA_AD_ACCOUNT_ID="123456"  # Platform API v1 only
 ```
 
 Or use a `.env` file:
@@ -80,6 +110,7 @@ ASA_TEAM_ID=SEARCHADS.your-team-id
 ASA_KEY_ID=your-key-id
 ASA_ORG_ID=123456
 ASA_PRIVATE_KEY_PATH=private-key.pem
+ASA_AD_ACCOUNT_ID=123456  # Platform API v1 only
 ```
 
 ## Resources

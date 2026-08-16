@@ -64,6 +64,7 @@ nav:
     - Ad Groups: guide/ad-groups.md
     - Keywords: guide/keywords.md
     - Reports: guide/reports.md
+    - Platform API v1: guide/platform-api-v1.md
     - Async Usage: guide/async.md
     - CLI: guide/cli.md
   - API Reference:
