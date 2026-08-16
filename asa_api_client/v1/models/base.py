@@ -64,15 +64,19 @@ class Money(V1Model):
 class V1Pagination(V1Model):
     """Pagination metadata on v1 list responses.
 
+    All fields are optional: the server echoes ``pageSize``/``offset``
+    back, and ``totalCount`` is only populated when the request set
+    ``fetchTotalCount: true``.
+
     Attributes:
         offset: The starting position for pagination.
         page_size: The number of items per page.
         total_count: The total number of items available server-side.
     """
 
-    offset: int
-    page_size: int = Field(alias="pageSize")
-    total_count: int = Field(alias="totalCount")
+    offset: int | None = None
+    page_size: int | None = Field(default=None, alias="pageSize")
+    total_count: int | None = Field(default=None, alias="totalCount")
 
 
 class ErrorDetail(V1Model):
@@ -130,7 +134,16 @@ class V1Page(V1Model, Generic[T]):
 
     @property
     def has_more(self) -> bool:
-        """Whether more items remain on the server beyond this page."""
+        """Whether more items remain on the server beyond this page.
+
+        Uses ``totalCount`` when the request asked for it; otherwise a
+        full page (``len(result) == pageSize``) implies more may remain.
+        """
         if self.pagination is None:
             return False
-        return self.pagination.offset + len(self.result) < self.pagination.total_count
+        if self.pagination.total_count is not None:
+            offset = self.pagination.offset or 0
+            return offset + len(self.result) < self.pagination.total_count
+        if self.pagination.page_size is not None:
+            return len(self.result) > 0 and len(self.result) >= self.pagination.page_size
+        return False

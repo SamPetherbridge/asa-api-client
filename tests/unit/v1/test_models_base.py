@@ -82,6 +82,33 @@ class TestV1Page:
         page = V1Page[Money].model_validate({"result": [{"amount": "1.00", "currency": "USD"}]})
         assert page.has_more is False
 
+    def test_has_more_true_on_full_page_without_total_count(self) -> None:
+        """Test full page implies more when totalCount was not requested."""
+        page = V1Page[Money].model_validate(
+            {
+                "result": [{"amount": "1.00", "currency": "USD"}],
+                "pagination": {"offset": 0, "pageSize": 1},
+            }
+        )
+        assert page.has_more is True
+
+    def test_has_more_false_on_short_page_without_total_count(self) -> None:
+        """Test short page implies exhaustion when totalCount is absent."""
+        page = V1Page[Money].model_validate(
+            {
+                "result": [{"amount": "1.00", "currency": "USD"}],
+                "pagination": {"offset": 0, "pageSize": 5},
+            }
+        )
+        assert page.has_more is False
+
+    def test_pagination_fields_all_optional(self) -> None:
+        """Test pagination parses when the server echoes nothing back."""
+        pagination = V1Pagination.model_validate({})
+        assert pagination.offset is None
+        assert pagination.page_size is None
+        assert pagination.total_count is None
+
 
 class TestV1Error:
     """Tests for the v1 error object."""
