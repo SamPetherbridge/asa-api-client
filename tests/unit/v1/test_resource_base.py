@@ -379,3 +379,13 @@ class TestWrites:
         """Test delete() handles an empty 204 response."""
         httpx_mock.add_response(url=f"{BASE_URL}/dummies/5", status_code=204)
         assert DummyResource(make_client()).delete(5) is None
+
+    def test_delete_tolerates_empty_200_body(self, httpx_mock: HTTPXMock) -> None:
+        """Test 200 with an empty body (documented for DELETE) doesn't raise."""
+        httpx_mock.add_response(url=f"{BASE_URL}/dummies/5", status_code=200, content=b"")
+        assert DummyResource(make_client()).delete(5) is None
+
+    async def test_delete_tolerates_empty_200_body_async(self, httpx_mock: HTTPXMock) -> None:
+        """Test the async path tolerates an empty 200 body."""
+        httpx_mock.add_response(url=f"{BASE_URL}/dummies/5", status_code=200, content=b"")
+        assert await DummyResource(make_client()).delete_async(5) is None

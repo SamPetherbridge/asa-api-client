@@ -401,7 +401,9 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
             if response.status_code >= 400:
                 self._handle_error(response)
 
-            if response.status_code == 204:
+            # DELETE endpoints are documented to return 200 with an
+            # empty body; treat any empty 2xx body like a 204.
+            if response.status_code == 204 or not response.content:
                 return {}
 
             result: dict[str, Any] = response.json()
@@ -477,7 +479,9 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
             if response.status_code >= 400:
                 self._handle_error(response)
 
-            if response.status_code == 204:
+            # DELETE endpoints are documented to return 200 with an
+            # empty body; treat any empty 2xx body like a 204.
+            if response.status_code == 204 or not response.content:
                 return {}
 
             result: dict[str, Any] = response.json()

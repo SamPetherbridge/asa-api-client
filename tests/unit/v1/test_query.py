@@ -93,6 +93,7 @@ class TestEnums:
             "GREATER_THAN",
             "GREATER_THAN_OR_EQUAL_TO",
             "IN",
+            "INCLUDE",
             "IS_NULL",
             "IS_NOT_NULL",
             "LESS_THAN",
