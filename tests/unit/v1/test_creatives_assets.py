@@ -1,5 +1,6 @@
 """Tests for the v1 creatives and assets resources."""
 
+import io
 import json
 
 import pytest
@@ -285,6 +286,31 @@ class TestCreativeResource:
 
 class TestAssetResource:
     """Tests for AssetResource endpoints."""
+
+    def test_upload_retries_transient_5xx(
+        self,
+        httpx_mock: HTTPXMock,
+        v1_client: AppleAdsClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test uploads retry on 503 and re-send the file bytes."""
+        monkeypatch.setattr("asa_api_client.v1.resources.base.time.sleep", lambda _: None)
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            method="POST",
+            url=f"{BASE_URL}/assets/upload",
+            status_code=503,
+            json={"error": {"message": "temporarily unavailable"}},
+        )
+        httpx_mock.add_response(
+            method="POST",
+            url=f"{BASE_URL}/assets/upload",
+            json={"result": {"id": "770e8400-e29b-41d4-a716-446655440002", "assetType": "IMAGE"}},
+        )
+        asset = AssetResource(v1_client).upload(io.BytesIO(b"png-bytes"), promoted_object_id="42")
+        assert asset.id == "770e8400-e29b-41d4-a716-446655440002"
+        retried = httpx_mock.get_requests(url=f"{BASE_URL}/assets/upload")[1]
+        assert b"png-bytes" in retried.content
 
     def test_upload_asset_sends_multipart(
         self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient

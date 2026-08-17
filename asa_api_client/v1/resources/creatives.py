@@ -5,10 +5,13 @@ presentation and tap destination; assets are unified media entities
 (currently images only) referenced from creative specs.
 """
 
+import asyncio
+import time
 from typing import IO
 
 import httpx
 
+from asa_api_client.logging import get_logger
 from asa_api_client.v1.models.creatives import (
     Asset,
     Creative,
@@ -16,6 +19,8 @@ from asa_api_client.v1.models.creatives import (
     CreativeUpdate,
 )
 from asa_api_client.v1.resources.base import (
+    DEFAULT_MAX_RETRIES,
+    RETRYABLE_STATUS_CODES,
     CreatableMixin,
     DeletableMixin,
     GettableMixin,
@@ -23,6 +28,8 @@ from asa_api_client.v1.resources.base import (
     UpdatableMixin,
     V1Resource,
 )
+
+logger = get_logger(__name__)
 
 #: The only promoted object type accepted by the asset upload endpoint.
 UPLOAD_PROMOTED_OBJECT_TYPE = "BUSINESS_BRAND"
@@ -95,6 +102,9 @@ class AssetResource(
         :meth:`GettableMixin.get` until ``eligibility.status`` shows
         ready before referencing it in a creative.
 
+        Retries on 429/5xx like JSON requests; file objects are read
+        fully into memory up front so retries can re-send the bytes.
+
         Args:
             file: The image file bytes or a binary file object.
                 Accepted formats: PNG, JPG, HEIC.
@@ -113,12 +123,27 @@ class AssetResource(
             PartialFailureError: If a 2xx response carries an error
                 block.
         """
-        response = self._http_client.post(
-            self._build_url("upload"),
-            files={"file": (file_name, file)},
-            data=self._upload_form(promoted_object_id, promoted_object_type),
-            headers=self._upload_headers(self._get_headers()),
-        )
+        payload = file if isinstance(file, bytes) else file.read()
+        headers = self._upload_headers(self._get_headers())
+        for attempt in range(DEFAULT_MAX_RETRIES + 1):
+            response = self._http_client.post(
+                self._build_url("upload"),
+                files={"file": (file_name, payload)},
+                data=self._upload_form(promoted_object_id, promoted_object_type),
+                headers=headers,
+            )
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < DEFAULT_MAX_RETRIES:
+                delay = self._calculate_retry_delay(attempt, response)
+                logger.warning(
+                    "Upload received %d (attempt %d/%d), retrying in %.1fs",
+                    response.status_code,
+                    attempt + 1,
+                    DEFAULT_MAX_RETRIES + 1,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
+            break
         return self._finish_upload(response)
 
     async def upload_async(
@@ -130,6 +155,9 @@ class AssetResource(
         file_name: str = "asset",
     ) -> Asset:
         """Upload a binary image file asynchronously.
+
+        Retries on 429/5xx like JSON requests; file objects are read
+        fully into memory up front so retries can re-send the bytes.
 
         Args:
             file: The image file bytes or a binary file object.
@@ -147,12 +175,27 @@ class AssetResource(
             PartialFailureError: If a 2xx response carries an error
                 block.
         """
-        response = await self._async_http_client.post(
-            self._build_url("upload"),
-            files={"file": (file_name, file)},
-            data=self._upload_form(promoted_object_id, promoted_object_type),
-            headers=self._upload_headers(await self._get_headers_async()),
-        )
+        payload = file if isinstance(file, bytes) else file.read()
+        headers = self._upload_headers(await self._get_headers_async())
+        for attempt in range(DEFAULT_MAX_RETRIES + 1):
+            response = await self._async_http_client.post(
+                self._build_url("upload"),
+                files={"file": (file_name, payload)},
+                data=self._upload_form(promoted_object_id, promoted_object_type),
+                headers=headers,
+            )
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < DEFAULT_MAX_RETRIES:
+                delay = self._calculate_retry_delay(attempt, response)
+                logger.warning(
+                    "Upload received %d (attempt %d/%d), retrying in %.1fs",
+                    response.status_code,
+                    attempt + 1,
+                    DEFAULT_MAX_RETRIES + 1,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+                continue
+            break
         return self._finish_upload(response)
 
     @staticmethod
