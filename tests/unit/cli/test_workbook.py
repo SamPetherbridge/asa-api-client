@@ -77,7 +77,11 @@ def _keyword_agg() -> pd.DataFrame:
     )
 
 
-def _write(tmp_path: Path) -> Path:
+def _write(
+    tmp_path: Path,
+    popularity: pd.DataFrame | None = None,
+    popularity_notes: list[str] | None = None,
+) -> Path:
     daily = _campaign_daily()
     kw = _keyword_agg()
     camp_agg = aggregate(daily, LEVEL_KEYS["campaigns"])
@@ -147,6 +151,8 @@ def _write(tmp_path: Path) -> Path:
             "search_terms": ["Search terms limited to trailing 90 days."],
             "ads": [],
         },
+        popularity=popularity,
+        popularity_notes=popularity_notes,
     )
     return path
 
@@ -223,3 +229,52 @@ class TestWorkbook:
         cd = wb["Chart Data"]
         assert cd.sheet_state == "hidden"
         assert cd["A1"].value == "date" and cd["B1"].value == "spend"
+
+    def test_popularity_sheet_written_when_data_present(self, tmp_path: Path) -> None:
+        """Popularity rows land after the analysis sheets with notes on top."""
+        frame = pd.DataFrame(
+            [
+                {
+                    "search_term": "puzzle",
+                    "source": "Both",
+                    "country_or_region": "US",
+                    "genre": "Games",
+                    "rank_in_genre": 1,
+                    "search_popularity_1_to_100": 95,
+                    "search_popularity_1_to_5": 5,
+                },
+                {
+                    "search_term": "chess",
+                    "source": "Keywords",
+                    "country_or_region": "AU",
+                    "genre": "Games",
+                    "rank_in_genre": 3,
+                    "search_popularity_1_to_100": 80,
+                    "search_popularity_1_to_5": 4,
+                },
+            ]
+        )
+        path = _write(tmp_path, popularity=frame, popularity_notes=["Week note."])
+        wb = load_workbook(path)
+        assert wb.sheetnames.index("Search Popularity") == wb.sheetnames.index("Ads") + 1
+        ws = wb["Search Popularity"]
+        assert ws["A1"].value == "Week note."
+        headers = [c.value for c in ws[2]]
+        assert headers[:4] == ["Search Term", "Source", "Country/Region", "Genre"]
+        assert ws["A3"].value == "puzzle" and ws["B3"].value == "Both"
+        assert ws["A4"].value == "chess"
+
+    def test_popularity_sheet_absent_by_default(self, tmp_path: Path) -> None:
+        """Without popularity data or notes the sheet is not created."""
+        wb = load_workbook(_write(tmp_path))
+        assert "Search Popularity" not in wb.sheetnames
+
+    def test_popularity_notes_only_sheet(self, tmp_path: Path) -> None:
+        """An empty frame with notes still writes an explanatory sheet."""
+        path = _write(
+            tmp_path,
+            popularity=pd.DataFrame(),
+            popularity_notes=["Search Popularity unavailable: nope."],
+        )
+        ws = load_workbook(path)["Search Popularity"]
+        assert ws["A1"].value == "Search Popularity unavailable: nope."

@@ -90,6 +90,17 @@ ANALYSIS_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
     ],
 }
 
+POPULARITY_SHEET = "Search Popularity"
+_POPULARITY_SPEC: list[tuple[str, str, str]] = [
+    ("search_term", "Search Term", "text"),
+    ("source", "Source", "text"),
+    ("country_or_region", "Country/Region", "text"),
+    ("genre", "Genre", "text"),
+    ("rank_in_genre", "Rank in Genre", "int"),
+    ("search_popularity_1_to_100", "Popularity (1-100)", "int"),
+    ("search_popularity_1_to_5", "Popularity (1-5)", "int"),
+]
+
 _COLUMN_WIDTHS = {"text": 28, "id": 12, "int": 12, "currency": 12, "percent": 9}
 _TAB_GREY = "#9CA3AF"
 
@@ -406,6 +417,8 @@ def write_workbook(
     daily: dict[str, pd.DataFrame],
     notes: dict[str, list[str]],
     currency_format: str = "$#,##0.00",
+    popularity: pd.DataFrame | None = None,
+    popularity_notes: list[str] | None = None,
 ) -> None:
     """Write the full analysis workbook to ``path``.
 
@@ -416,6 +429,10 @@ def write_workbook(
         daily: Normalized daily frames keyed by level key.
         notes: Per-level notes rendered above the daily tables.
         currency_format: Excel number format for money cells.
+        popularity: Optional Search Popularity frame; the sheet is
+            written when the frame has rows or ``popularity_notes`` has
+            entries, and omitted entirely when ``popularity`` is None.
+        popularity_notes: Notes rendered above the popularity table.
     """
     book = xlsxwriter.Workbook(str(path), {"nan_inf_to_errors": True})
     try:
@@ -431,6 +448,13 @@ def write_workbook(
                 fmts,
                 cpa_benchmark,
             )
+        if popularity is not None and (not popularity.empty or popularity_notes):
+            ws = book.add_worksheet(POPULARITY_SHEET)
+            start = 0
+            for note in popularity_notes or []:
+                ws.write_string(start, 0, note, fmts["note"])
+                start += 1
+            _write_table(ws, popularity, _POPULARITY_SPEC, fmts, start_row=start)
         for key, label in LEVELS:
             ws = book.add_worksheet(f"Daily · {label}")
             ws.set_tab_color(_TAB_GREY)

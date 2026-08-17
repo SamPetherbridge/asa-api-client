@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.progress import BarColumn, Progress, TaskID, TextColumn
 from xlsxwriter.exceptions import XlsxWriterException
 
-from asa_api_client.cli import dates, fetch, metrics, v1_smoke
+from asa_api_client.cli import dates, fetch, metrics, popularity, v1_smoke
 from asa_api_client.cli.v1_adapter import V1FetchAdapter
 from asa_api_client.cli.workbook import SummaryData, write_workbook
 from asa_api_client.client import AppleSearchAdsClient
@@ -210,6 +210,14 @@ def analyze(
         wasted=metrics.wasted_spend(analysis["keywords"]),
     )
 
+    # The popularity sheet is enrichment via the v1 insights API; it
+    # must never break (or fail) an otherwise successful analyze run.
+    try:
+        popularity_frame, popularity_notes = popularity.build_popularity(result)
+    except Exception as exc:  # nothing from this sheet may abort the workbook
+        popularity_frame, popularity_notes = pd.DataFrame(), []
+        _err.print(f"[yellow]Warning:[/yellow] Search Popularity sheet skipped: {exc}")
+
     out_path = output or Path(f"asa-analysis-{file_scope}-{today:%Y-%m-%d}.xlsx")
     notes = {key: lv.notes for key, lv in result.levels.items()}
     try:
@@ -220,6 +228,8 @@ def analyze(
             daily=daily_frames,
             notes=notes,
             currency_format=fmt,
+            popularity=popularity_frame,
+            popularity_notes=popularity_notes,
         )
     except (OSError, XlsxWriterException) as exc:
         raise _fail(f"Could not write {out_path}: {exc}") from exc
