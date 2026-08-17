@@ -4,6 +4,7 @@ This module provides the AppleSearchAdsClient class, which is the
 primary interface for interacting with the Apple Search Ads API.
 """
 
+import warnings
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -29,9 +30,15 @@ DEFAULT_BASE_URL = "https://api.searchads.apple.com/api/v5"
 
 
 class AppleSearchAdsClient:
-    """Client for interacting with the Apple Search Ads API.
+    """Client for the legacy Apple Search Ads Campaign Management API v5.
 
-    This is the main entry point for the library. It provides access
+    .. deprecated:: 0.4.0
+        Apple sunsets the Campaign Management API v5 on **2027-01-26**.
+        Migrate to :class:`~asa_api_client.AppleAdsClient` (Platform API
+        v1) — it uses the same credentials. Constructing this client
+        emits a ``DeprecationWarning``.
+
+    This is the v5 entry point for the library. It provides access
     to all API resources through a structured, resource-based interface.
 
     The client supports both synchronous and asynchronous operations.
@@ -125,7 +132,19 @@ class AppleSearchAdsClient:
 
         Raises:
             ConfigurationError: If credentials are invalid or missing.
+
+        Warns:
+            DeprecationWarning: The Campaign Management API v5 sunsets
+                on 2027-01-26; migrate to ``AppleAdsClient``.
         """
+        warnings.warn(
+            "AppleSearchAdsClient targets the Campaign Management API v5, "
+            "which Apple sunsets on 2027-01-26. Migrate to AppleAdsClient "
+            "(Apple Ads Platform API v1) — same credentials; see "
+            "https://asa-api-client.peth.au/guide/platform-api-v1/",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.org_id = org_id
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
