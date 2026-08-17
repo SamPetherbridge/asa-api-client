@@ -14,7 +14,17 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from asa_api_client.v1.models.base import Money, V1Model
+from asa_api_client.v1.models.base import V1Model
+from asa_api_client.v1.models.shared import (
+    BidStrategy,
+    TargetingData,
+)
+from asa_api_client.v1.models.shared import (
+    BidStrategyGoal as BidStrategyGoal,
+)
+from asa_api_client.v1.models.shared import (
+    BidStrategyType as BidStrategyType,
+)
 
 
 class PricingModel(StrEnum):
@@ -90,44 +100,6 @@ class AdGroupSystemLimitedStatusReason(StrEnum):
     ADS_LIMITED = "ADS_LIMITED"
 
 
-class BidStrategyType(StrEnum):
-    """Bidding strategy applied to the ad group's auctions."""
-
-    MANUAL_CPT = "MANUAL_CPT"
-    MANUAL_CPM = "MANUAL_CPM"
-    MAX_CONVERSIONS = "MAX_CONVERSIONS"
-    MAX_ENGAGEMENTS = "MAX_ENGAGEMENTS"
-
-
-class BidStrategyGoal(StrEnum):
-    """Optimization goal paired with a bid strategy type.
-
-    Documented pairings: ``MANUAL_CPT`` ↔ ``TAP``, ``MANUAL_CPM`` ↔
-    ``IMPRESSION``, ``MAX_CONVERSIONS`` ↔ ``INSTALL``,
-    ``MAX_ENGAGEMENTS`` ↔ ``TAP``.
-    """
-
-    IMPRESSION = "IMPRESSION"
-    INSTALL = "INSTALL"
-    TAP = "TAP"
-
-
-class TargetingData(V1Model):
-    """Include/exclude value lists for one targeting dimension.
-
-    All values are strings, even numeric IDs and ages (e.g. ``"18"``,
-    ``"123456789"``). Only ``appCategory`` and ``appDownloader``
-    support ``exclude``; other dimensions are include-only.
-
-    Attributes:
-        include: Values to restrict delivery to.
-        exclude: Values to block delivery to.
-    """
-
-    include: list[str] | None = None
-    exclude: list[str] | None = None
-
-
 class AdGroupTargeting(V1Model):
     """Targeting dimensions for an ad group.
 
@@ -166,25 +138,6 @@ class AdGroupTargeting(V1Model):
     app_downloader: TargetingData | None = Field(default=None, alias="appDownloader")
     daypart: TargetingData | None = None
     location_group: TargetingData | None = Field(default=None, alias="locationGroup")
-
-
-class BidStrategy(V1Model):
-    """Bid strategy for an ad group.
-
-    ``bid_strategy_type`` and ``bid_strategy_goal`` must always be
-    sent together as a documented pairing; omitting one or mismatching
-    them returns an error.
-
-    Attributes:
-        bid_strategy_type: The bidding strategy type.
-        bid_strategy_goal: The optimization goal matching the type.
-        bid: For ``MANUAL_CPT`` the max amount paid per tap; for
-            automated strategies an optional per-auction ceiling.
-    """
-
-    bid_strategy_type: BidStrategyType | None = Field(default=None, alias="bidStrategyType")
-    bid_strategy_goal: BidStrategyGoal | None = Field(default=None, alias="bidStrategyGoal")
-    bid: Money | None = None
 
 
 class AdGroup(V1Model):

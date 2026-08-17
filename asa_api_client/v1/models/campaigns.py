@@ -13,6 +13,18 @@ from enum import StrEnum
 from pydantic import Field, field_serializer
 
 from asa_api_client.v1.models.base import Money, V1Model
+from asa_api_client.v1.models.shared import (
+    BidStrategy,
+    InvoiceDetail,
+    SharedBudgetAssignment,
+    TargetingData,
+)
+from asa_api_client.v1.models.shared import (
+    BidStrategyGoal as BidStrategyGoal,
+)
+from asa_api_client.v1.models.shared import (
+    BidStrategyType as BidStrategyType,
+)
 
 
 class BillingEvent(StrEnum):
@@ -161,23 +173,6 @@ class SupplyPlacement(StrEnum):
     MAPS_SEARCH_HOME = "MAPS_SEARCH_HOME"
 
 
-class BidStrategyType(StrEnum):
-    """How bids are set in auctions."""
-
-    MANUAL_CPT = "MANUAL_CPT"
-    MANUAL_CPM = "MANUAL_CPM"
-    MAX_CONVERSIONS = "MAX_CONVERSIONS"
-    MAX_ENGAGEMENTS = "MAX_ENGAGEMENTS"
-
-
-class BidStrategyGoal(StrEnum):
-    """The outcome a bid strategy optimizes for."""
-
-    IMPRESSION = "IMPRESSION"
-    INSTALL = "INSTALL"
-    TAP = "TAP"
-
-
 class RegulationType(StrEnum):
     """Regulatory disclosure types."""
 
@@ -196,21 +191,6 @@ class RegulationResponseValue(StrEnum):
     TRUE = "TRUE"
     FALSE = "FALSE"
     NOT_ANSWERED = "NOT_ANSWERED"
-
-
-class TargetingData(V1Model):
-    """A targeting dimension's include/exclude value sets.
-
-    Campaign-level targeting is include-only: ``exclude`` is unsupported
-    for every campaign targeting dimension (unlike ad-group targeting).
-
-    Attributes:
-        include: Values to target.
-        exclude: Values to exclude (ad-group targeting only).
-    """
-
-    include: list[str] | None = None
-    exclude: list[str] | None = None
 
 
 class CampaignTargeting(V1Model):
@@ -235,55 +215,6 @@ class DailyBudget(V1Model):
     """
 
     value: Money | None = None
-
-
-class BidStrategy(V1Model):
-    """How a campaign competes in auctions.
-
-    ``bid_strategy_type`` and ``bid_strategy_goal`` must both be
-    supplied together and match an allowed pairing on create and update.
-
-    Attributes:
-        bid_strategy_type: The bidding type (manual or automated).
-        bid_strategy_goal: The outcome the strategy optimizes for.
-        bid: The bid amount for manual strategies.
-    """
-
-    bid_strategy_type: BidStrategyType | None = Field(default=None, alias="bidStrategyType")
-    bid_strategy_goal: BidStrategyGoal | None = Field(default=None, alias="bidStrategyGoal")
-    bid: Money | None = None
-
-
-class SharedBudgetAssignment(V1Model):
-    """One budget-order assignment in a campaign's ``sharedBudgets``.
-
-    Attributes:
-        budget_id: The assigned budget order's ID.
-    """
-
-    budget_id: int | None = Field(default=None, alias="budgetId")
-
-
-class InvoiceDetail(V1Model):
-    """Invoice billing details for Line of Credit (LOC) accounts.
-
-    ``primary_buyer_name``, ``primary_buyer_email``, and
-    ``billing_email`` are required by the API when creating a campaign
-    on an LOC account.
-
-    Attributes:
-        client_name: Identifies the advertiser or product.
-        primary_buyer_name: The primary buyer's name.
-        primary_buyer_email: The primary buyer's email address.
-        order_number: Purchase order number.
-        billing_email: The billing email address.
-    """
-
-    client_name: str | None = Field(default=None, alias="clientName")
-    primary_buyer_name: str | None = Field(default=None, alias="primaryBuyerName")
-    primary_buyer_email: str | None = Field(default=None, alias="primaryBuyerEmail")
-    order_number: str | None = Field(default=None, alias="orderNumber")
-    billing_email: str | None = Field(default=None, alias="billingEmail")
 
 
 class RegulationResponse(V1Model):

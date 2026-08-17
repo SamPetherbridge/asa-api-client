@@ -13,6 +13,12 @@ from typing import Annotated
 from pydantic import Field, field_serializer
 
 from asa_api_client.v1.models.base import Money, V1Model
+from asa_api_client.v1.models.shared import (
+    InvoiceDetail,
+)
+from asa_api_client.v1.models.shared import (
+    SharedBudgetAssignment as SharedBudgetAssignment,
+)
 
 # The API requires yyyy-MM-dd'T'HH:mm:ss.SSS timestamps in UTC with no
 # timezone suffix.
@@ -89,32 +95,6 @@ class BudgetSystemStatusReason(StrEnum):
     PROCESSING = "PROCESSING"
     SCHEDULE_EXPIRED = "SCHEDULE_EXPIRED"
     SCHEDULE_PENDING = "SCHEDULE_PENDING"
-
-
-class InvoiceDetail(V1Model):
-    """Billing details for Line of Credit (LOC) accounts.
-
-    Embedded in budget order (and campaign) objects. On budget order
-    creation the API requires ``name``, ``primary_buyer_name``,
-    ``primary_buyer_email``, and ``billing_email``; all fields are
-    modeled optional because responses may omit any of them.
-
-    Attributes:
-        name: Billing contact name (required on budget-order create).
-        client_name: Identifies the advertiser or product. Nullable.
-        primary_buyer_name: Primary buyer's name (required on create).
-        primary_buyer_email: Primary buyer's email address (required
-            on create).
-        order_number: Purchase order (PO) number. Nullable.
-        billing_email: Billing email address (required on create).
-    """
-
-    name: str | None = None
-    client_name: str | None = Field(default=None, alias="clientName")
-    primary_buyer_name: str | None = Field(default=None, alias="primaryBuyerName")
-    primary_buyer_email: str | None = Field(default=None, alias="primaryBuyerEmail")
-    order_number: str | None = Field(default=None, alias="orderNumber")
-    billing_email: str | None = Field(default=None, alias="billingEmail")
 
 
 class InvoiceDetailUpdate(V1Model):
@@ -242,19 +222,6 @@ class SharedBudgetUpdate(V1Model):
     def _serialize_timestamps(self, value: datetime | None) -> str | None:
         """Serialize timestamps in the API's millisecond format."""
         return _format_timestamp(value)
-
-
-class SharedBudgetAssignment(V1Model):
-    """Read-only link between a campaign and a budget order.
-
-    Returned only inside a Campaign's ``sharedBudgets`` array; NOT
-    independently addressable via any endpoint.
-
-    Attributes:
-        budget_id: The budget order the campaign is assigned to.
-    """
-
-    budget_id: int | None = Field(default=None, alias="budgetId")
 
 
 class SharedBudgetAssignmentCreate(V1Model):
