@@ -30,6 +30,12 @@ class TestMoney:
         assert money.amount == "10.50"
         assert money.currency == "EUR"
 
+    def test_parses_amount_without_currency(self) -> None:
+        """Test the API's currency-less zero amount (seen on ad group bids) parses."""
+        money = Money.model_validate({"amount": "0"})
+        assert money.amount == "0"
+        assert money.currency is None
+
 
 class TestV1Pagination:
     """Tests for pagination metadata parsing."""
