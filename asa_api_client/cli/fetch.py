@@ -22,8 +22,8 @@ class MoneyLike(Protocol):
     """Anything money-shaped with a currency code."""
 
     @property
-    def currency(self) -> str:
-        """ISO currency code."""
+    def currency(self) -> str | None:
+        """ISO currency code (v1 responses may omit it)."""
         ...
 
 

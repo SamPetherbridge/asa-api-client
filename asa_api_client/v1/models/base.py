@@ -29,11 +29,14 @@ class Money(V1Model):
 
     Attributes:
         amount: The monetary amount as a string to preserve precision.
-        currency: The ISO 4217 currency code (e.g., "USD", "AUD").
+        currency: The ISO 4217 currency code (e.g., "USD", "AUD"). Optional
+            because the API omits it on some responses — an ad group's
+            ``bidStrategy.bid`` comes back as ``{"amount": "0"}`` — and a
+            required field there failed the whole query page.
     """
 
     amount: str
-    currency: str
+    currency: str | None = None
 
     @classmethod
     def usd(cls, amount: float | int | str) -> Self:

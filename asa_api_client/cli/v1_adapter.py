@@ -117,9 +117,10 @@ def _money_payload(money: "Money | None") -> dict[str, str] | None:
         money: The v1 monetary value, or None.
 
     Returns:
-        An ``{"amount", "currency"}`` dict, or None.
+        An ``{"amount", "currency"}`` dict, or None. A currency-less v1
+        amount also becomes None, since v5 Money requires a currency.
     """
-    if money is None:
+    if money is None or money.currency is None:
         return None
     return {"amount": money.amount, "currency": money.currency}
 

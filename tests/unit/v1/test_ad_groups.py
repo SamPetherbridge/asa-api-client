@@ -322,6 +322,27 @@ class TestPartialFailure:
         assert exc_info.value.details[0]["code"] == "INVALID_BID_STRATEGY"
 
 
+class TestBidStrategyParsing:
+    """Tests for bid strategy shapes the live API returns."""
+
+    def test_zero_bid_without_currency_parses(self) -> None:
+        """Test an ad group whose bidStrategy.bid omits currency still validates.
+
+        Apple returns ``{"amount": "0"}`` with no currency for some ad groups;
+        requiring currency failed the whole query page.
+        """
+        ad_group = AdGroup.model_validate(
+            {
+                "id": 1,
+                "name": "Zero bid",
+                "bidStrategy": {"bidStrategyType": "MANUAL_CPT", "bid": {"amount": "0"}},
+            }
+        )
+        assert ad_group.bid_strategy is not None
+        assert ad_group.bid_strategy.bid == Money(amount="0")
+        assert ad_group.bid_strategy.bid.currency is None
+
+
 class TestEnums:
     """Tests for enum values and round-trips."""
 

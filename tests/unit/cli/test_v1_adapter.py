@@ -27,10 +27,11 @@ from typer.testing import CliRunner
 
 from asa_api_client.cli.analyze import app
 from asa_api_client.cli.fetch import flatten_daily
-from asa_api_client.cli.v1_adapter import V1FetchAdapter
+from asa_api_client.cli.v1_adapter import V1FetchAdapter, _money_payload
 from asa_api_client.client import AppleSearchAdsClient
 from asa_api_client.models.reports import ReportingResponse
 from asa_api_client.v1.client import AppleAdsClient
+from asa_api_client.v1.models.base import Money
 
 V1_BASE = "https://api.ads.apple.com/v1"
 TOKEN_URL = "https://appleid.apple.com/auth/oauth2/token"
@@ -427,3 +428,18 @@ class TestAnalyzeFlag:
         monkeypatch.setattr(AppleAdsClient, "from_env", classmethod(v1_boom))
         result = runner.invoke(app, ["analyze"])
         assert result.exception is v5_sentinel
+
+
+class TestMoneyPayload:
+    """v1 Money -> v5 {amount, currency} dict, which v5 Money validates."""
+
+    def test_full_money_converts(self) -> None:
+        """Test an amount with currency becomes the v5 dict unchanged."""
+        assert _money_payload(Money(amount="1.50", currency="USD")) == {
+            "amount": "1.50",
+            "currency": "USD",
+        }
+
+    def test_currency_less_money_is_dropped(self) -> None:
+        """Test a currency-less amount becomes None, not a dict v5 Money rejects."""
+        assert _money_payload(Money(amount="0")) is None
