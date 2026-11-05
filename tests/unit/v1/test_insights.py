@@ -412,3 +412,11 @@ class TestModels:
         assert insights.bid_recommendation.suggested_bid_amount == 2.35
         dumped = insights.model_dump(by_alias=True, exclude_none=True)
         assert dumped == {"bidRecommendation": {"suggestedBidAmount": 2.35}}
+
+
+def test_impression_share_row_coerces_int_promoted_object_id() -> None:
+    """The live API returns promotedObjectId as an int; the row coerces to str."""
+    from asa_api_client.v1.models.insights import ImpressionShareRow
+
+    row = ImpressionShareRow.model_validate({"promotedObjectId": 1579138717, "rank": 1})
+    assert row.promoted_object_id == "1579138717"

@@ -18,7 +18,7 @@ from datetime import date
 from enum import StrEnum
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from asa_api_client.v1.models.base import V1Model
 
@@ -236,6 +236,13 @@ class ImpressionShareRow(V1Model):
     high_impression_share: float | None = Field(default=None, alias="highImpressionShare")
     rank: int | None = None
     search_popularity_1_to_5: int | None = Field(default=None, alias="searchPopularity1to5")
+
+    @field_validator("promoted_object_id", mode="before")
+    @classmethod
+    def _coerce_promoted_object_id(cls, value: object) -> object:
+        # The live API returns promotedObjectId as an integer here (verified
+        # 2026-11-05) even though every other v1 endpoint uses a string.
+        return str(value) if isinstance(value, int) else value
 
 
 class SearchTermPopularityRow(V1Model):
