@@ -45,20 +45,20 @@ client.keywords.delete(keyword_id)
 
 ## Bulk Create, Update, and Delete
 
-Use `client.bulk` to create, update, or delete up to 5,000 keywords or negative keywords per request:
+Use `client.bulk` to create, update, or delete keywords and negative keywords in batches. Lists larger than Apple's 5,000-item per-request limit are automatically split into sequential 5,000-item chunks with continuous `correlationId` numbering:
 
 ```python
-from asa_api_client.v1.models.bulk import BulkKeywordUpdate
+from asa_api_client.v1.models.bulk import BulkKeywordCreate, BulkKeywordUpdate
 
 created_items = client.bulk.create_keywords(
     [
-        KeywordCreate(
+        BulkKeywordCreate(
             ad_group_id=ad_group_id,
             text="expense tracker",
             match_type=KeywordMatchType.EXACT,
             bid=Money(amount="1.60", currency="USD"),
         ),
-        KeywordCreate(
+        BulkKeywordCreate(
             ad_group_id=ad_group_id,
             text="personal finance",
             match_type=KeywordMatchType.BROAD,

@@ -43,17 +43,15 @@ client = AppleAdsClient.from_env()
 
 ### Discovering Your Ad Account ID
 
-`ASA_AD_ACCOUNT_ID` may be omitted at startup to discover accessible ad accounts via `/v1/acls`:
+`ASA_AD_ACCOUNT_ID` may be omitted at startup to auto-resolve or inspect accessible ad accounts via `/v1/acls`:
 
 ```python
 from asa_api_client import AppleAdsClient
 
 with AppleAdsClient.from_env() as client:
-    for acl in client.acls.list():
-        if acl.ad_account:
-            print(acl.ad_account.id, acl.ad_account.name)
-
-    client.ad_account_id = "123456"
+    # Automatically picks your sole account (or matches prefer_org_id / ASA_ORG_ID)
+    account_id = client.resolve_ad_account()
+    print(f"Using ad account {account_id}")
 ```
 
 Or run `asa v1-smoke` from the CLI (`pip install "asa-api-client[cli]"`), which lists accessible accounts and runs a read-only smoke test.

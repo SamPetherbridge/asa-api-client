@@ -61,6 +61,11 @@ ad_group_report = client.reports.ad_groups(request)
 keyword_report = client.reports.keywords(request)
 search_term_report = client.reports.search_terms(request)
 ad_report = client.reports.ads(request)
+
+# Stream large multi-page reports automatically (up to 5,000 rows per page)
+for row in client.reports.iter_keywords(request):
+    if row.metadata and row.total_metrics:
+        print(row.metadata.text, row.total_metrics.taps)
 ```
 
 ## Granularities

@@ -33,17 +33,20 @@ ASA_AD_ACCOUNT_ID=123456
 client = AppleAdsClient.from_env()
 ```
 
-### Discovering Your Ad Account ID
+### Discovering & Scoping Ad Accounts
 
-`ad_account_id` may be omitted at construction to call bootstrap endpoints (`/v1/me`, `/v1/acls`, `/v1/orgs`):
+`ad_account_id` may be omitted at construction to auto-resolve via `/v1/acls`, or you can fan out across multiple accounts using `client.with_account(...)` (which shares the OAuth token cache and HTTP connection pools without mutating the parent client):
 
 ```python
 with AppleAdsClient.from_env() as client:
-    me = client.ad_accounts.me()
-    for acl in client.acls.list():
-        print(acl)
+    # Auto-select sole account (or match prefer_org_id / ASA_ORG_ID)
+    client.resolve_ad_account()
 
-    client.ad_account_id = "123456"
+    # Or query multiple accounts concurrently / independently
+    for acl in client.acls.list():
+        if acl.ad_account and acl.ad_account.id is not None:
+            scoped = client.with_account(acl.ad_account.id)
+            print(acl.ad_account.name, len(scoped.campaigns.query()))
 ```
 
 Or run the bundled read-only smoke check:
@@ -82,11 +85,11 @@ Account-scoped parity resources: `campaigns`, `ad_groups`, `keywords`, `negative
 
 v1-exclusive capabilities:
 
-- **`recommendations`** — Target-CPA and daily-budget recommendations with `apply` / `dismiss`
+- **`recommendations`** — Target-CPA and daily-budget recommendations with `apply` / `dismiss` and `iter_target_cpas` / `iter_daily_budgets`
 - **`suggestions`** — Keyword, phrase, category, and target-CPA suggestions
-- **`insights`** — Impression share and **search term popularity** reports
-- **`change_history`** — Account audit trail
-- **`bulk`** — Bulk keyword and negative-keyword `create_*`, `update_*`, and `delete_*` (up to 5,000 items per call)
+- **`insights`** — Impression share (`iter_impression_share`) and **search term popularity** (`iter_search_term_popularity`)
+- **`change_history`** — Account audit trail (`query` / `iter_all` / `get_details`)
+- **`bulk`** — Bulk keyword and negative-keyword `create_*`, `update_*`, and `delete_*` (lists over 5,000 items are automatically split into 5,000-item batches)
 - **Apple Maps ads** — `brands`, `locations`, `location_groups`, `business_categories`, `brand_rejection_reasons`, `brand_reports`
 
 Every sync method has an `_async` twin.
@@ -108,7 +111,7 @@ except PartialFailureError as exc:
         print(detail.get("code"), detail.get("message"))
 ```
 
-Automatic retries with exponential backoff cover transient 429/5xx errors on `GET` requests as well as idempotent `POST .../query` reads.
+Automatic retries with exponential backoff and bounded jitter cover rate limiting (`429`) and connection errors across all methods, and server errors (`5xx`) on idempotent requests (`GET`, `PUT`, `DELETE`, and read-only `POST .../query` endpoints). Non-idempotent `POST` writes never retry after `5xx` or read timeouts so entities are not duplicated. Retry behavior is configurable on `AppleAdsClient(..., max_retries=5, retry_initial_delay=5.0, retry_max_delay=120.0, retry_jitter=True)`.
 
 ## Reports
 
