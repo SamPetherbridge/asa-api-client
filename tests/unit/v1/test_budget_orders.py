@@ -255,7 +255,7 @@ class TestDelete:
         """Test delete() issues DELETE to the item path and returns None."""
         mock_token(httpx_mock)
         httpx_mock.add_response(url=f"{BASE_URL}/90001", json={})
-        assert BudgetOrderResource(v1_client).delete(90001) is None
+        BudgetOrderResource(v1_client).delete(90001)
         request = httpx_mock.get_request(url=f"{BASE_URL}/90001")
         assert request is not None
         assert request.method == "DELETE"

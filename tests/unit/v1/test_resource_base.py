@@ -38,11 +38,11 @@ class DummyModel(V1Model):
 
 
 class DummyResource(
-    GettableMixin,
-    QueryableMixin,
-    CreatableMixin,
-    UpdatableMixin,
-    DeletableMixin,
+    GettableMixin[DummyModel, DummyModel, DummyModel],
+    QueryableMixin[DummyModel, DummyModel, DummyModel],
+    CreatableMixin[DummyModel, DummyModel, DummyModel],
+    UpdatableMixin[DummyModel, DummyModel, DummyModel],
+    DeletableMixin[DummyModel, DummyModel, DummyModel],
     V1Resource[DummyModel, DummyModel, DummyModel],
 ):
     """Resource with every mixin, for exercising the base."""
@@ -378,14 +378,17 @@ class TestWrites:
     def test_delete_returns_none_on_204(self, httpx_mock: HTTPXMock) -> None:
         """Test delete() handles an empty 204 response."""
         httpx_mock.add_response(url=f"{BASE_URL}/dummies/5", status_code=204)
-        assert DummyResource(make_client()).delete(5) is None
+        DummyResource(make_client()).delete(5)
+        assert httpx_mock.get_requests()[-1].method == "DELETE"
 
     def test_delete_tolerates_empty_200_body(self, httpx_mock: HTTPXMock) -> None:
         """Test 200 with an empty body (documented for DELETE) doesn't raise."""
         httpx_mock.add_response(url=f"{BASE_URL}/dummies/5", status_code=200, content=b"")
-        assert DummyResource(make_client()).delete(5) is None
+        DummyResource(make_client()).delete(5)
+        assert httpx_mock.get_requests()[-1].method == "DELETE"
 
     async def test_delete_tolerates_empty_200_body_async(self, httpx_mock: HTTPXMock) -> None:
         """Test the async path tolerates an empty 200 body."""
         httpx_mock.add_response(url=f"{BASE_URL}/dummies/5", status_code=200, content=b"")
-        assert await DummyResource(make_client()).delete_async(5) is None
+        await DummyResource(make_client()).delete_async(5)
+        assert httpx_mock.get_requests()[-1].method == "DELETE"

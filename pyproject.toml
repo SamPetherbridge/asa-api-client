@@ -5,13 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "asa-api-client"
 version = "0.4.2"
-description = "A modern Python client for the Apple Search Ads API with full type safety and async support"
+description = "A modern Python client for the Apple Ads API with full type safety and async support"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 authors = [{ name = "Sam Petherbridge", email = "hello@peth.me" }]
 keywords = [
     "apple",
+    "apple-ads",
     "search-ads",
     "asa",
     "advertising",
@@ -26,14 +27,15 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
     "Framework :: Pydantic :: 2",
 ]
 dependencies = [
-    "httpx>=0.27.0",
+    "httpx>=0.28.1",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.6.0",
-    "pyjwt[crypto]>=2.9.0",
+    "pyjwt[crypto]>=2.15.1",
 ]
 
 [project.optional-dependencies]

@@ -52,6 +52,11 @@ site/
 .env.local
 *.pem
 
+# Agent & CLI output
+.claude/
+.remember/
+asa-analysis-*.xlsx
+
 # OS
 .DS_Store
 Thumbs.db

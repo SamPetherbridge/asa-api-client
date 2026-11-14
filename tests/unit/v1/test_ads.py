@@ -205,7 +205,7 @@ class TestDeleteAd:
         """Test delete() issues DELETE and tolerates the 200 {} body."""
         mock_token(httpx_mock)
         httpx_mock.add_response(url=f"{BASE_URL}/ads/987654321", status_code=200, json={})
-        assert AdResource(v1_client).delete(987654321) is None
+        AdResource(v1_client).delete(987654321)
         request = httpx_mock.get_requests()[-1]
         assert request.method == "DELETE"
         assert str(request.url) == f"{BASE_URL}/ads/987654321"

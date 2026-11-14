@@ -16,14 +16,16 @@ from pydantic import Field
 
 from asa_api_client.v1.models.base import V1Model
 from asa_api_client.v1.models.shared import (
-    BidStrategy,
-    TargetingData,
+    BidStrategy as BidStrategy,
 )
 from asa_api_client.v1.models.shared import (
     BidStrategyGoal as BidStrategyGoal,
 )
 from asa_api_client.v1.models.shared import (
     BidStrategyType as BidStrategyType,
+)
+from asa_api_client.v1.models.shared import (
+    TargetingData as TargetingData,
 )
 
 

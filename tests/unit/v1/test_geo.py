@@ -244,7 +244,7 @@ class TestLookup:
         httpx_mock.add_response(url=GEO_URL, json={"result": []})
         request_model = GeoSearchPostRequest(
             geo_request=[GeoRequest(id="1", entity=GeoEntityType.COUNTRY)],
-            supply_source="MAPS",
+            supply_source=SearchSupplySourceType.MAPS,
         )
         GeoResource(v1_client).lookup(request_model)
         assert json.loads(httpx_mock.get_requests()[-1].content) == {
@@ -273,7 +273,7 @@ class TestLookup:
         )
         request_model = GeoSearchPostRequest(
             geo_request=[GeoRequest(id="1", entity=GeoEntityType.COUNTRY)],
-            supply_source="APPSTORE",
+            supply_source=SearchSupplySourceType.APPSTORE,
         )
         with pytest.raises(PartialFailureError, match="bad geo request"):
             GeoResource(v1_client).lookup(request_model)
@@ -291,9 +291,11 @@ class TestEnums:
 
     def test_supply_source_round_trip(self) -> None:
         """Test SearchSupplySourceType round-trips through a request model."""
-        request_model = GeoSearchPostRequest(
-            geo_request=[GeoRequest(id="1", entity="Country")],
-            supply_source="MAPS",
+        request_model = GeoSearchPostRequest.model_validate(
+            {
+                "geoRequest": [{"id": "1", "entity": "Country"}],
+                "supplySource": "MAPS",
+            }
         )
         assert request_model.supply_source is SearchSupplySourceType.MAPS
         dumped = request_model.model_dump(by_alias=True, exclude_none=True, mode="json")

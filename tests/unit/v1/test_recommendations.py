@@ -281,7 +281,7 @@ class TestTargetCpaApplyDismiss:
                 ApplyTargetCpaRecommendation(
                     id="rec-tcpa-1",
                     promoted_object_id="123456789",
-                    promoted_object_type="APPSTORE_APP",
+                    promoted_object_type=RecommendationPromotedObjectType.APPSTORE_APP,
                 )
             ]
         )
@@ -311,7 +311,7 @@ class TestTargetCpaApplyDismiss:
                 ApplyTargetCpaRecommendation(
                     id="rec-tcpa-1",
                     promoted_object_id="123456789",
-                    promoted_object_type="APPSTORE_APP",
+                    promoted_object_type=RecommendationPromotedObjectType.APPSTORE_APP,
                 )
             ]
         )
@@ -417,7 +417,7 @@ class TestDailyBudgetApplyDismiss:
                 ApplyDailyCapRecommendation(
                     id="rec-dc-1",
                     promoted_object_id="123456789",
-                    promoted_object_type="APPSTORE_APP",
+                    promoted_object_type=RecommendationPromotedObjectType.APPSTORE_APP,
                 )
             ]
         )
@@ -437,7 +437,7 @@ class TestDailyBudgetApplyDismiss:
                 ApplyDailyCapRecommendation(
                     id="rec-dc-1",
                     promoted_object_id="123456789",
-                    promoted_object_type="APPSTORE_APP",
+                    promoted_object_type=RecommendationPromotedObjectType.APPSTORE_APP,
                 )
             ]
         )

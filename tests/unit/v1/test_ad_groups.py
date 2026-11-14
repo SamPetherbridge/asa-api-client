@@ -293,7 +293,7 @@ class TestDeleteAdGroup:
         """Test delete() sends DELETE to the item path and returns None."""
         _mock_token(httpx_mock)
         httpx_mock.add_response(url=f"{BASE_URL}/adgroups/2001", json={})
-        assert AdGroupResource(v1_client).delete(2001) is None
+        AdGroupResource(v1_client).delete(2001)
         request = httpx_mock.get_requests(url=f"{BASE_URL}/adgroups/2001")[0]
         assert request.method == "DELETE"
 

@@ -485,7 +485,7 @@ class TestLocationGroupResource:
                 }
             },
         )
-        assert LocationGroupResource(v1_client).delete("lg-1") is None
+        LocationGroupResource(v1_client).delete("lg-1")
         request = httpx_mock.get_request(url=f"{BASE_URL}/location-groups/lg-1")
         assert request is not None
         assert request.method == "DELETE"

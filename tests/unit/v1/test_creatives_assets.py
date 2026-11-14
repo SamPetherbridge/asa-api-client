@@ -15,6 +15,7 @@ from asa_api_client.v1.models.creatives import (
     AssetType,
     CreativeCreate,
     CreativeSpec,
+    CreativeSubtype,
     CreativeSystemStatus,
     CreativeType,
     CreativeUpdate,
@@ -112,10 +113,10 @@ class TestCreativeResource:
         CreativeResource(v1_client).create(
             CreativeCreate(
                 name="AwayFinder - Store Promotion Creative",
-                creative_type="LOCAL_ADS_SEARCH_CREATIVE",
+                creative_type=CreativeType.LOCAL_ADS_SEARCH_CREATIVE,
                 creative_spec=CreativeSpec(
                     brand_id="111222",
-                    creative_subtype="BUSINESS_ASSET",
+                    creative_subtype=CreativeSubtype.BUSINESS_ASSET,
                     creative_assets=[
                         AssetReference(asset_id="770e8400-e29b-41d4-a716-446655440002")
                     ],

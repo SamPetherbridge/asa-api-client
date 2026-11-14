@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 
+import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
@@ -50,7 +51,7 @@ def _mock_token_endpoint(httpx_mock: HTTPXMock) -> None:
     )
 
 
-def _api_requests(httpx_mock: HTTPXMock) -> list:
+def _api_requests(httpx_mock: HTTPXMock) -> list[httpx.Request]:
     """Return captured API requests, excluding the OAuth token request."""
     return [r for r in httpx_mock.get_requests() if r.url.host != "appleid.apple.com"]
 
@@ -301,7 +302,7 @@ class TestDeleteCampaign:
     ) -> None:
         """Test delete() sends DELETE and tolerates the null-result body."""
         httpx_mock.add_response(url=f"{BASE_URL}/campaigns/55", json={"result": None})
-        assert CampaignResource(v1_client).delete(55) is None
+        CampaignResource(v1_client).delete(55)
         request = _api_requests(httpx_mock)[0]
         assert request.method == "DELETE"
         assert str(request.url) == f"{BASE_URL}/campaigns/55"

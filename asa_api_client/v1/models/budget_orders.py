@@ -14,7 +14,7 @@ from pydantic import Field, field_serializer
 
 from asa_api_client.v1.models.base import Money, V1Model
 from asa_api_client.v1.models.shared import (
-    InvoiceDetail,
+    InvoiceDetail as InvoiceDetail,
 )
 from asa_api_client.v1.models.shared import (
     SharedBudgetAssignment as SharedBudgetAssignment,
