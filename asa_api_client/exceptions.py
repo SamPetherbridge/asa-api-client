@@ -224,14 +224,13 @@ class ConfigurationError(AppleSearchAdsError):
 class PartialFailureError(AppleSearchAdsError):
     """Raised when the API reports errors inside a successful HTTP response.
 
-    The Apple Ads Platform API v1 can return HTTP 2xx with an ``error``
-    block describing request-level or per-item failures (e.g. in bulk
-    operations). This exception surfaces those instead of silently
-    reporting success.
+    Both the Apple Ads Platform API v1 and legacy v5 endpoints can
+    return HTTP 2xx with an ``error`` block describing request-level or
+    per-item failures (e.g. in bulk operations). This exception surfaces
+    those instead of silently reporting success.
 
     Attributes:
-        details: The ``error.details`` list from the response, where each
-            entry has ``code``, ``message``, and ``info`` keys.
+        details: List of error entries from the response ``error`` block.
     """
 
     def __init__(

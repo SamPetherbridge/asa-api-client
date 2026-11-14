@@ -70,6 +70,37 @@ class CampaignResource(WritableResource[Campaign, CampaignCreate, CampaignUpdate
         super().__init__(client)
         self._campaign_id: int | None = None
 
+    def update(self, resource_id: int, data: CampaignUpdate) -> Campaign:
+        """Update an existing campaign.
+
+        Apple's v5 campaign update endpoint requires the payload nested
+        under a ``{"campaign": {...}}`` key.
+
+        Args:
+            resource_id: The campaign ID to update.
+            data: The update data.
+
+        Returns:
+            The updated campaign.
+        """
+        payload = data.model_dump(by_alias=True, exclude_none=True, mode="json")
+        response = self._request("PUT", str(resource_id), json={"campaign": payload})
+        return self._parse_response(response)
+
+    async def update_async(self, resource_id: int, data: CampaignUpdate) -> Campaign:
+        """Update an existing campaign asynchronously.
+
+        Args:
+            resource_id: The campaign ID to update.
+            data: The update data.
+
+        Returns:
+            The updated campaign.
+        """
+        payload = data.model_dump(by_alias=True, exclude_none=True, mode="json")
+        response = await self._request_async("PUT", str(resource_id), json={"campaign": payload})
+        return self._parse_response(response)
+
     def __call__(self, campaign_id: int) -> "CampaignContext":
         """Get a context for a specific campaign.
 

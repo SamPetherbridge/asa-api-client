@@ -273,7 +273,7 @@ class ReportingResponse(BaseModel):
         """Convert report data to a pandas DataFrame.
 
         This method requires pandas to be installed. Install with:
-        `pip install asa-api[pandas]`
+        `pip install "asa-api-client[pandas]"`
 
         Returns:
             A pandas DataFrame with report data flattened into rows.
@@ -292,7 +292,8 @@ class ReportingResponse(BaseModel):
             import pandas as pd
         except ImportError:
             raise ImportError(
-                "pandas is required for to_dataframe(). Install with: pip install asa-api[pandas]"
+                "pandas is required for to_dataframe(). "
+                'Install with: pip install "asa-api-client[pandas]"'
             ) from None
 
         rows_data: list[dict[str, Any]] = []

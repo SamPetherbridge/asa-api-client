@@ -20,6 +20,7 @@ from asa_api_client.exceptions import (
     AuthorizationError,
     NetworkError,
     NotFoundError,
+    PartialFailureError,
     RateLimitError,
     ServerError,
     ValidationError,
@@ -214,6 +215,45 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
             response_body=error_body,
         )
 
+    def _check_body_error(self, body: dict[str, Any], status_code: int) -> None:
+        """Raise when a 2xx HTTP response carries a non-empty error block.
+
+        Bulk v5 endpoints can return HTTP 200 with ``error.errors``
+        populated when items fail validation (e.g. currency mismatch).
+
+        Args:
+            body: The parsed response JSON.
+            status_code: The HTTP status code of the response.
+
+        Raises:
+            PartialFailureError: When the body carries a non-empty error.
+        """
+        error_data = body.get("error")
+        if not isinstance(error_data, dict) or not error_data:
+            return
+        raw_errors = error_data.get("errors")
+        details = (
+            [entry for entry in raw_errors if isinstance(entry, dict)]
+            if isinstance(raw_errors, list)
+            else []
+        )
+        message = error_data.get("message")
+        if not details and not message:
+            return
+        first_detail = details[0] if details else {}
+        summary = (
+            message
+            or first_detail.get("message")
+            or first_detail.get("messageCode")
+            or "API reported errors in the response"
+        )
+        raise PartialFailureError(
+            str(summary),
+            status_code=status_code,
+            response_body=body,
+            details=details,
+        )
+
     def _calculate_retry_delay(
         self,
         attempt: int,
@@ -328,10 +368,11 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
             if response.status_code >= 400:
                 self._handle_error(response)
 
-            if response.status_code == 204:
+            if response.status_code == 204 or not response.content:
                 return {}
 
             result: dict[str, Any] = response.json()
+            self._check_body_error(result, response.status_code)
             return result
 
         # This should not be reached, but handle it just in case
@@ -412,10 +453,11 @@ class BaseResource(Generic[T, CreateT, UpdateT]):
             if response.status_code >= 400:
                 self._handle_error(response)
 
-            if response.status_code == 204:
+            if response.status_code == 204 or not response.content:
                 return {}
 
             result: dict[str, Any] = response.json()
+            self._check_body_error(result, response.status_code)
             return result
 
         # This should not be reached, but handle it just in case

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from asa_api_client.exceptions import NotFoundError
 from asa_api_client.models.base import PaginatedResponse
 from asa_api_client.models.keywords import (
     Keyword,
@@ -108,6 +109,45 @@ class KeywordResource(WritableResource[Keyword, KeywordCreate, KeywordUpdate]):
         data = [kw.model_dump(by_alias=True, exclude_none=True, mode="json") for kw in keywords]
         response = await self._request_async("POST", "bulk", json=data)
         return self._parse_list_response(response)
+
+    def update(self, resource_id: int, data: KeywordUpdate) -> Keyword:
+        """Update a single targeting keyword by delegating to the bulk endpoint.
+
+        Apple's v5 API does not serve ``PUT targetingkeywords/{id}``; all
+        keyword updates go through ``PUT targetingkeywords/bulk``.
+
+        Args:
+            resource_id: The keyword ID to update.
+            data: The update data.
+
+        Returns:
+            The updated keyword.
+
+        Raises:
+            NotFoundError: If no updated keyword is returned.
+        """
+        result = self.update_bulk([(resource_id, data)])
+        if not result.data:
+            raise NotFoundError(f"Keyword {resource_id} not found", status_code=404)
+        return result.data[0]
+
+    async def update_async(self, resource_id: int, data: KeywordUpdate) -> Keyword:
+        """Update a single targeting keyword asynchronously via the bulk endpoint.
+
+        Args:
+            resource_id: The keyword ID to update.
+            data: The update data.
+
+        Returns:
+            The updated keyword.
+
+        Raises:
+            NotFoundError: If no updated keyword is returned.
+        """
+        result = await self.update_bulk_async([(resource_id, data)])
+        if not result.data:
+            raise NotFoundError(f"Keyword {resource_id} not found", status_code=404)
+        return result.data[0]
 
     def update_bulk(self, updates: list[tuple[int, KeywordUpdate]]) -> PaginatedResponse[Keyword]:
         """Update multiple keywords at once.
