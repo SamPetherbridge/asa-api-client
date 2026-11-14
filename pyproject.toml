@@ -52,7 +52,7 @@ dev = [
     "mypy>=1.13.0",
     "ruff>=0.8.0",
     "pre-commit>=4.0.0",
-    "typer>=0.15.0",
+    "typer>=0.29.1",
     "rich>=13.0.0",
     "xlsxwriter>=3.2.0",
     "openpyxl>=3.1.0",
@@ -60,11 +60,11 @@ dev = [
 ]
 docs = [
     "mkdocs>=1.6.0",
-    "mkdocs-material>=9.5.0",
-    "mkdocstrings[python]>=0.27.0",
+    "mkdocs-material>=9.8.1",
+    "mkdocstrings[python]>=1.0.8",
 ]
 cli = [
-    "typer>=0.15.0",
+    "typer>=0.29.1",
     "rich>=13.0.0",
     "pandas>=2.2.0",
     "xlsxwriter>=3.2.0",
