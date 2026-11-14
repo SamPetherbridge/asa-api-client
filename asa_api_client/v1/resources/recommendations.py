@@ -9,7 +9,7 @@ mandatory ``promotedObjectId`` / ``promotedObjectType`` filters; apply
 and dismiss bodies are bare JSON arrays of request objects.
 """
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
 from asa_api_client.v1.models.base import V1Page, V1Pagination
@@ -337,3 +337,121 @@ class RecommendationResource(
             "POST", "daily-budgets/dismiss", json=self._items_payload(recommendations)
         )
         return self._parse_daily_cap_histories(data)
+
+    @staticmethod
+    def _has_more(page: V1Page[Any], offset: int, page_size: int) -> bool:
+        """Determine whether additional recommendation pages exist."""
+        if not page.result:
+            return False
+        if page.pagination is not None and page.pagination.total_count is not None:
+            return offset + len(page.result) < page.pagination.total_count
+        return len(page.result) >= page_size
+
+    def iter_target_cpas(
+        self,
+        query: RecommendationQueryRequest,
+        *,
+        page_size: int = 500,
+    ) -> Iterator[TargetCpaRecommendation]:
+        """Iterate over all matching Target CPA recommendations.
+
+        Overrides ``query.pagination`` while preserving filters and sorting.
+
+        Args:
+            query: Recommendation query carrying promoted-object filters.
+            page_size: Items per page (up to 1,000).
+
+        Yields:
+            Each :class:`TargetCpaRecommendation` across all pages.
+        """
+        base_payload = self._query_payload(query)
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            page = self._parse_page(self._request("POST", "target-cpas/query", json=payload))
+            yield from page
+            if not self._has_more(page, offset, page_size):
+                break
+            offset += len(page)
+
+    async def iter_target_cpas_async(
+        self,
+        query: RecommendationQueryRequest,
+        *,
+        page_size: int = 500,
+    ) -> AsyncIterator[TargetCpaRecommendation]:
+        """Iterate over all matching Target CPA recommendations asynchronously.
+
+        Args:
+            query: Recommendation query carrying promoted-object filters.
+            page_size: Items per page (up to 1,000).
+
+        Yields:
+            Each :class:`TargetCpaRecommendation` across all pages.
+        """
+        base_payload = self._query_payload(query)
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = await self._request_async("POST", "target-cpas/query", json=payload)
+            page = self._parse_page(data)
+            for item in page:
+                yield item
+            if not self._has_more(page, offset, page_size):
+                break
+            offset += len(page)
+
+    def iter_daily_budgets(
+        self,
+        query: RecommendationQueryRequest,
+        *,
+        page_size: int = 500,
+    ) -> Iterator[DailyCapRecommendation]:
+        """Iterate over all matching daily budget recommendations.
+
+        Overrides ``query.pagination`` while preserving filters and sorting.
+
+        Args:
+            query: Recommendation query carrying promoted-object filters.
+            page_size: Items per page (up to 1,000).
+
+        Yields:
+            Each :class:`DailyCapRecommendation` across all pages.
+        """
+        base_payload = self._query_payload(query)
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = self._request("POST", "daily-budgets/query", json=payload)
+            page = self._parse_daily_budget_page(data)
+            yield from page
+            if not self._has_more(page, offset, page_size):
+                break
+            offset += len(page)
+
+    async def iter_daily_budgets_async(
+        self,
+        query: RecommendationQueryRequest,
+        *,
+        page_size: int = 500,
+    ) -> AsyncIterator[DailyCapRecommendation]:
+        """Iterate over all matching daily budget recommendations asynchronously.
+
+        Args:
+            query: Recommendation query carrying promoted-object filters.
+            page_size: Items per page (up to 1,000).
+
+        Yields:
+            Each :class:`DailyCapRecommendation` across all pages.
+        """
+        base_payload = self._query_payload(query)
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = await self._request_async("POST", "daily-budgets/query", json=payload)
+            page = self._parse_daily_budget_page(data)
+            for item in page:
+                yield item
+            if not self._has_more(page, offset, page_size):
+                break
+            offset += len(page)

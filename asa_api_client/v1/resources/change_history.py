@@ -7,6 +7,7 @@ through the ``changes`` array *inside* a single record — not through
 records — so both endpoints are explicit methods rather than mixins.
 """
 
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 from asa_api_client.v1.models.base import V1Page, V1Pagination
@@ -107,6 +108,88 @@ class ChangeHistoryResource(V1Resource[AuditSummary, AuditSummary, AuditSummary]
         """
         data = await self._request_async("POST", "query", json=self._query_payload(query, options))
         return self._parse_page(data)
+
+    def _paged_audit_payload(
+        self,
+        query: Query | None,
+        options: dict[str, str] | None,
+        page_size: int,
+        offset: int,
+    ) -> dict[str, Any]:
+        """Build an audit query body with iteration-controlled pagination."""
+        merged_options = {"needTotals": "true", **(options or {})}
+        payload = self._query_payload(query, merged_options)
+        payload["pagination"] = {"pageSize": page_size, "offset": offset}
+        return payload
+
+    @staticmethod
+    def _has_more_audits(page: V1Page[AuditSummary], offset: int, page_size: int) -> bool:
+        """Determine whether additional audit summary pages remain."""
+        if not page.result:
+            return False
+        if page.pagination is not None and page.pagination.total_count is not None:
+            return offset + len(page.result) < page.pagination.total_count
+        return len(page.result) >= page_size
+
+    def iter_all(
+        self,
+        query: Query | None = None,
+        *,
+        options: dict[str, str] | None = None,
+        page_size: int = 100,
+    ) -> Iterator[AuditSummary]:
+        """Iterate over all matching audit summaries with automatic pagination.
+
+        Overrides ``pagination`` on ``query`` and defaults
+        ``options["needTotals"]`` to ``"true"`` unless explicitly provided.
+
+        Args:
+            query: Query with filters/sorting (must include an ``eventTime``
+                filter).
+            options: Optional options map (``needTotals``, ``timeZone``,
+                ``metadata``).
+            page_size: Number of audit summary rows per page.
+
+        Yields:
+            Each :class:`AuditSummary` row across all pages.
+        """
+        offset = 0
+        while True:
+            payload = self._paged_audit_payload(query, options, page_size, offset)
+            page = self._parse_page(self._request("POST", "query", json=payload))
+            yield from page
+            if not self._has_more_audits(page, offset, page_size):
+                break
+            offset += len(page)
+
+    async def iter_all_async(
+        self,
+        query: Query | None = None,
+        *,
+        options: dict[str, str] | None = None,
+        page_size: int = 100,
+    ) -> AsyncIterator[AuditSummary]:
+        """Iterate over all matching audit summaries asynchronously.
+
+        Args:
+            query: Query with filters/sorting (must include an ``eventTime``
+                filter).
+            options: Optional options map.
+            page_size: Number of audit summary rows per page.
+
+        Yields:
+            Each :class:`AuditSummary` row across all pages.
+        """
+        offset = 0
+        while True:
+            payload = self._paged_audit_payload(query, options, page_size, offset)
+            data = await self._request_async("POST", "query", json=payload)
+            page = self._parse_page(data)
+            for item in page:
+                yield item
+            if not self._has_more_audits(page, offset, page_size):
+                break
+            offset += len(page)
 
     @staticmethod
     def _details_params(limit: int | None, offset: int | None) -> dict[str, Any] | None:

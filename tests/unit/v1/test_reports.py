@@ -746,3 +746,61 @@ class TestReportDataFrame:
         df = response.to_dataframe()
         assert df.empty
         assert response.to_records() == []
+
+
+class TestReportAutoPagination:
+    """Tests for iter_* and iter_*_async on ReportResource and BrandReportResource."""
+
+    def test_iter_campaigns_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_campaigns yields rows across pages without mutating request."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/reports/apps/campaigns/query",
+            json={
+                "result": {"rows": [{"metadata": {"id": 1, "name": "C1"}}]},
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/reports/apps/campaigns/query",
+            json={
+                "result": {"rows": [{"metadata": {"id": 2, "name": "C2"}}]},
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        req = AppsReportingRequest(
+            time_range=ReportTimeRange(start=date(2026, 8, 1), end=date(2026, 8, 7))
+        )
+        rows = list(ReportResource(v1_client).iter_campaigns(req, page_size=1))
+        assert [r.metadata.id for r in rows if r.metadata] == [1, 2]
+        assert req.pagination is None
+        bodies = [
+            json.loads(r.content)
+            for r in httpx_mock.get_requests(url=f"{BASE_URL}/reports/apps/campaigns/query")
+        ]
+        assert [b["pagination"] for b in bodies] == [
+            {"offset": 0, "pageSize": 1},
+            {"offset": 1, "pageSize": 1},
+        ]
+
+    async def test_brand_iter_keywords_async_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test BrandReportResource.iter_keywords_async stops when page is short."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/reports/business-brands/keywords/query",
+            json={"result": {"rows": [{"metadata": {"id": 10}}, {"metadata": {"id": 20}}]}},
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/reports/business-brands/keywords/query",
+            json={"result": {"rows": [{"metadata": {"id": 30}}]}},
+        )
+        ids = [
+            row.metadata.id
+            async for row in BrandReportResource(v1_client).iter_keywords_async(page_size=2)
+            if row.metadata is not None
+        ]
+        assert ids == [10, 20, 30]

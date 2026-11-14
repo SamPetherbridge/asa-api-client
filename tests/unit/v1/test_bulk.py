@@ -579,3 +579,88 @@ class TestBulkEnums:
         assert dumped["matchType"] == "CATEGORY"
         parsed = BulkKeywordCreate.model_validate(dumped)
         assert parsed.match_type is KeywordMatchType.CATEGORY
+
+
+class TestBulkAutoChunking:
+    """Tests for automatic 5,000-item batching in BulkOperationResource."""
+
+    def test_empty_items_returns_empty_without_http_call(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Empty bulk lists return [] immediately without hitting the API."""
+        assert BulkOperationResource(v1_client).delete_keywords([]) == []
+        assert httpx_mock.get_requests() == []
+
+    def test_splits_over_5000_items_with_continuous_correlation_ids(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Lists > 5,000 split into sequential 5,000-item chunks with continuous correlationId."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/keywords/bulk-delete",
+            json={
+                "result": [
+                    {"correlationId": i, "operation": "DELETE", "success": True}
+                    for i in range(1, 5001)
+                ],
+                "error": None,
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/keywords/bulk-delete",
+            json={
+                "result": [
+                    {"correlationId": 5001, "operation": "DELETE", "success": True},
+                    {"correlationId": 5002, "operation": "DELETE", "success": True},
+                ],
+                "error": None,
+            },
+        )
+
+        ids = list(range(10_001, 15_003))  # 5,002 keyword IDs
+        results = BulkOperationResource(v1_client).delete_keywords(ids, allow_partial_success=True)
+
+        requests = httpx_mock.get_requests(url=f"{BASE_URL}/keywords/bulk-delete")
+        assert len(requests) == 2
+        first_body = json.loads(requests[0].content)
+        second_body = json.loads(requests[1].content)
+        assert len(first_body["items"]) == 5000
+        assert first_body["items"][0]["correlationId"] == 1
+        assert first_body["items"][-1]["correlationId"] == 5000
+        assert second_body["items"] == [
+            {"correlationId": 5001, "data": {"id": 15001}},
+            {"correlationId": 5002, "data": {"id": 15002}},
+        ]
+        assert len(results) == 5002
+        assert results[-1].correlation_id == 5002
+
+    async def test_splits_over_5000_items_async(
+        self,
+        httpx_mock: HTTPXMock,
+        v1_client: AppleAdsClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Async bulk calls also split chunks at MAX_BULK_ITEMS."""
+        monkeypatch.setattr("asa_api_client.v1.resources.bulk.MAX_BULK_ITEMS", 2)
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/keywords/bulk-update",
+            json={
+                "result": [
+                    {"correlationId": 1, "operation": "UPDATE", "success": True},
+                    {"correlationId": 2, "operation": "UPDATE", "success": True},
+                ],
+                "error": None,
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/keywords/bulk-update",
+            json={
+                "result": [{"correlationId": 3, "operation": "UPDATE", "success": True}],
+                "error": None,
+            },
+        )
+        updates = [BulkKeywordUpdate(id=i, status=KeywordStatus.PAUSED) for i in (10, 20, 30)]
+        results = await BulkOperationResource(v1_client).update_keywords_async(updates)
+        assert [r.correlation_id for r in results] == [1, 2, 3]
+        assert len(httpx_mock.get_requests(url=f"{BASE_URL}/keywords/bulk-update")) == 2

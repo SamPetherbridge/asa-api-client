@@ -331,3 +331,56 @@ class TestEnumsAndModels:
             "NOT_FOUND",
             "NOT_AUTHED",
         }
+
+
+class TestChangeHistoryAutoPagination:
+    """Tests for iter_all and iter_all_async on ChangeHistoryResource."""
+
+    def test_iter_all_defaults_need_totals_and_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_all injects needTotals='true' and pages through audit rows."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/query",
+            json={
+                "result": [{**AUDIT_SUMMARY_JSON, "transactionId": "txn-1"}],
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/query",
+            json={
+                "result": [{**AUDIT_SUMMARY_JSON, "transactionId": "txn-2"}],
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        query = Query().where("eventTime", "GREATER_THAN", "2026-02-01T00:00:00")
+        rows = list(
+            ChangeHistoryResource(v1_client).iter_all(
+                query, options={"metadata": "latest"}, page_size=1
+            )
+        )
+        assert [r.transaction_id for r in rows] == ["txn-1", "txn-2"]
+        first_body = json.loads(httpx_mock.get_requests(url=f"{BASE_URL}/query")[0].content)
+        assert first_body["options"] == {"needTotals": "true", "metadata": "latest"}
+        assert first_body["pagination"] == {"pageSize": 1, "offset": 0}
+
+    async def test_iter_all_async_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_all_async walks audit summary pages asynchronously."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/query",
+            json={
+                "result": [{**AUDIT_SUMMARY_JSON, "transactionId": "txn-a"}],
+                "pagination": {"offset": 0, "pageSize": 2, "totalCount": 1},
+            },
+        )
+        query = Query().where("eventTime", "GREATER_THAN", "2026-02-01T00:00:00")
+        txns = [
+            row.transaction_id
+            async for row in ChangeHistoryResource(v1_client).iter_all_async(query, page_size=2)
+        ]
+        assert txns == ["txn-a"]

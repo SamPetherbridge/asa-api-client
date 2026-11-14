@@ -584,3 +584,60 @@ class TestEnumsAndQueryObjects:
         }
         sorting = RecommendationSorting(field="creationTime")
         assert sorting.model_dump(by_alias=True, exclude_none=True) == {"field": "creationTime"}
+
+
+class TestRecommendationAutoPagination:
+    """Tests for iter_target_cpas and iter_daily_budgets."""
+
+    def test_iter_target_cpas_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_target_cpas pages through all recommendations."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/target-cpas/query",
+            json={
+                "result": [{**TCPA_RECOMMENDATION_JSON, "id": "rec-1"}],
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/target-cpas/query",
+            json={
+                "result": [{**TCPA_RECOMMENDATION_JSON, "id": "rec-2"}],
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        query = RecommendationQueryRequest.for_promoted_object("123456789", "APPSTORE_APP")
+        ids = [
+            rec.id for rec in RecommendationResource(v1_client).iter_target_cpas(query, page_size=1)
+        ]
+        assert ids == ["rec-1", "rec-2"]
+
+    async def test_iter_daily_budgets_async_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_daily_budgets_async pages through daily budget recommendations."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/daily-budgets/query",
+            json={
+                "result": [{**DAILY_CAP_RECOMMENDATION_JSON, "id": "dc-1"}],
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/daily-budgets/query",
+            json={
+                "result": [{**DAILY_CAP_RECOMMENDATION_JSON, "id": "dc-2"}],
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        query = RecommendationQueryRequest.for_promoted_object("123456789", "APPSTORE_APP")
+        ids = [
+            rec.id
+            async for rec in RecommendationResource(v1_client).iter_daily_budgets_async(
+                query, page_size=1
+            )
+        ]
+        assert ids == ["dc-1", "dc-2"]

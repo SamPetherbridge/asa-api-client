@@ -14,26 +14,38 @@ An ``error`` block in a 2xx body raises
 transport before parsing.
 """
 
-from typing import TypeVar
+from collections.abc import AsyncIterator, Iterator
+from typing import Any, TypeVar
 
-from asa_api_client.v1.models.base import V1Model
+from asa_api_client.v1.models.base import V1Model, V1Pagination
 from asa_api_client.v1.models.reports import (
     AppsAdGroupReportResponse,
+    AppsAdGroupReportRow,
     AppsAdReportResponse,
+    AppsAdReportRow,
     AppsCampaignReportResponse,
+    AppsCampaignReportRow,
     AppsKeywordReportResponse,
+    AppsKeywordReportRow,
     AppsReportingRequest,
     AppsSearchTermReportResponse,
+    AppsSearchTermReportRow,
     BrandsAdGroupReportResponse,
+    BrandsAdGroupReportRow,
     BrandsAdReportResponse,
+    BrandsAdReportRow,
     BrandsCampaignReportResponse,
+    BrandsCampaignReportRow,
     BrandsKeywordReportResponse,
+    BrandsKeywordReportRow,
     BrandsReportingRequest,
     BrandsSearchTermReportResponse,
+    BrandsSearchTermReportRow,
 )
 from asa_api_client.v1.resources.base import V1Resource
 
 ResponseT = TypeVar("ResponseT", bound=V1Model)
+RowT = TypeVar("RowT", bound=V1Model)
 
 
 class _BaseReportResource(V1Resource[V1Model, V1Model, V1Model]):
@@ -80,6 +92,63 @@ class _BaseReportResource(V1Resource[V1Model, V1Model, V1Model]):
         payload = self._dump(request) if request is not None else {}
         data = await self._request_async("POST", path, json=payload)
         return response_class.model_validate(data)
+
+    @staticmethod
+    def _has_more_rows(
+        row_count: int,
+        offset: int,
+        page_size: int,
+        pagination: V1Pagination | None,
+    ) -> bool:
+        """Determine whether additional report rows remain on the server."""
+        if row_count == 0:
+            return False
+        if pagination is not None and pagination.total_count is not None:
+            return offset + row_count < pagination.total_count
+        return row_count >= page_size
+
+    def _iter_report_rows(
+        self,
+        path: str,
+        request: V1Model | None,
+        response_class: type[ResponseT],
+        _row_class: type[RowT],
+        page_size: int,
+    ) -> Iterator[RowT]:
+        """Iterate across pages of a reporting endpoint synchronously."""
+        base_payload = self._dump(request) if request is not None else {}
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = self._request("POST", path, json=payload)
+            response: Any = response_class.model_validate(data)
+            rows: list[RowT] = (response.result.rows or []) if response.result is not None else []
+            yield from rows
+            if not self._has_more_rows(len(rows), offset, page_size, response.pagination):
+                break
+            offset += len(rows)
+
+    async def _iter_report_rows_async(
+        self,
+        path: str,
+        request: V1Model | None,
+        response_class: type[ResponseT],
+        _row_class: type[RowT],
+        page_size: int,
+    ) -> AsyncIterator[RowT]:
+        """Iterate across pages of a reporting endpoint asynchronously."""
+        base_payload = self._dump(request) if request is not None else {}
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = await self._request_async("POST", path, json=payload)
+            response: Any = response_class.model_validate(data)
+            rows: list[RowT] = (response.result.rows or []) if response.result is not None else []
+            for row in rows:
+                yield row
+            if not self._has_more_rows(len(rows), offset, page_size, response.pagination):
+                break
+            offset += len(rows)
 
 
 class ReportResource(_BaseReportResource):
@@ -245,6 +314,228 @@ class ReportResource(_BaseReportResource):
             "searchterms/query", request, AppsSearchTermReportResponse
         )
 
+    def iter_campaigns(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[AppsCampaignReportRow]:
+        """Iterate over all campaign report rows with automatic pagination.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsCampaignReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "campaigns/query",
+            request,
+            AppsCampaignReportResponse,
+            AppsCampaignReportRow,
+            page_size,
+        )
+
+    def iter_campaigns_async(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[AppsCampaignReportRow]:
+        """Iterate over all campaign report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsCampaignReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "campaigns/query",
+            request,
+            AppsCampaignReportResponse,
+            AppsCampaignReportRow,
+            page_size,
+        )
+
+    def iter_ad_groups(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[AppsAdGroupReportRow]:
+        """Iterate over all ad group report rows with automatic pagination.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsAdGroupReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "adgroups/query",
+            request,
+            AppsAdGroupReportResponse,
+            AppsAdGroupReportRow,
+            page_size,
+        )
+
+    def iter_ad_groups_async(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[AppsAdGroupReportRow]:
+        """Iterate over all ad group report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsAdGroupReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "adgroups/query",
+            request,
+            AppsAdGroupReportResponse,
+            AppsAdGroupReportRow,
+            page_size,
+        )
+
+    def iter_ads(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[AppsAdReportRow]:
+        """Iterate over all ad report rows with automatic pagination.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsAdReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "ads/query", request, AppsAdReportResponse, AppsAdReportRow, page_size
+        )
+
+    def iter_ads_async(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[AppsAdReportRow]:
+        """Iterate over all ad report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsAdReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "ads/query", request, AppsAdReportResponse, AppsAdReportRow, page_size
+        )
+
+    def iter_keywords(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[AppsKeywordReportRow]:
+        """Iterate over all keyword report rows with automatic pagination.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsKeywordReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "keywords/query",
+            request,
+            AppsKeywordReportResponse,
+            AppsKeywordReportRow,
+            page_size,
+        )
+
+    def iter_keywords_async(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[AppsKeywordReportRow]:
+        """Iterate over all keyword report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsKeywordReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "keywords/query",
+            request,
+            AppsKeywordReportResponse,
+            AppsKeywordReportRow,
+            page_size,
+        )
+
+    def iter_search_terms(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[AppsSearchTermReportRow]:
+        """Iterate over all search term report rows with automatic pagination.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsSearchTermReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "searchterms/query",
+            request,
+            AppsSearchTermReportResponse,
+            AppsSearchTermReportRow,
+            page_size,
+        )
+
+    def iter_search_terms_async(
+        self,
+        request: AppsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[AppsSearchTermReportRow]:
+        """Iterate over all search term report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`AppsSearchTermReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "searchterms/query",
+            request,
+            AppsSearchTermReportResponse,
+            AppsSearchTermReportRow,
+            page_size,
+        )
+
 
 class BrandReportResource(_BaseReportResource):
     """Apple Maps (BRANDS) performance reports.
@@ -398,4 +689,226 @@ class BrandReportResource(_BaseReportResource):
         """
         return await self._run_report_async(
             "searchterms/query", request, BrandsSearchTermReportResponse
+        )
+
+    def iter_campaigns(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[BrandsCampaignReportRow]:
+        """Iterate over all Apple Maps campaign report rows across pages.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsCampaignReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "campaigns/query",
+            request,
+            BrandsCampaignReportResponse,
+            BrandsCampaignReportRow,
+            page_size,
+        )
+
+    def iter_campaigns_async(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[BrandsCampaignReportRow]:
+        """Iterate over all Apple Maps campaign report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsCampaignReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "campaigns/query",
+            request,
+            BrandsCampaignReportResponse,
+            BrandsCampaignReportRow,
+            page_size,
+        )
+
+    def iter_ad_groups(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[BrandsAdGroupReportRow]:
+        """Iterate over all Apple Maps ad group report rows across pages.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsAdGroupReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "adgroups/query",
+            request,
+            BrandsAdGroupReportResponse,
+            BrandsAdGroupReportRow,
+            page_size,
+        )
+
+    def iter_ad_groups_async(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[BrandsAdGroupReportRow]:
+        """Iterate over all Apple Maps ad group report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsAdGroupReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "adgroups/query",
+            request,
+            BrandsAdGroupReportResponse,
+            BrandsAdGroupReportRow,
+            page_size,
+        )
+
+    def iter_ads(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[BrandsAdReportRow]:
+        """Iterate over all Apple Maps ad report rows across pages.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsAdReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "ads/query", request, BrandsAdReportResponse, BrandsAdReportRow, page_size
+        )
+
+    def iter_ads_async(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[BrandsAdReportRow]:
+        """Iterate over all Apple Maps ad report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsAdReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "ads/query", request, BrandsAdReportResponse, BrandsAdReportRow, page_size
+        )
+
+    def iter_keywords(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[BrandsKeywordReportRow]:
+        """Iterate over all Apple Maps keyword report rows across pages.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsKeywordReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "keywords/query",
+            request,
+            BrandsKeywordReportResponse,
+            BrandsKeywordReportRow,
+            page_size,
+        )
+
+    def iter_keywords_async(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[BrandsKeywordReportRow]:
+        """Iterate over all Apple Maps keyword report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsKeywordReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "keywords/query",
+            request,
+            BrandsKeywordReportResponse,
+            BrandsKeywordReportRow,
+            page_size,
+        )
+
+    def iter_search_terms(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[BrandsSearchTermReportRow]:
+        """Iterate over all Apple Maps search term report rows across pages.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsSearchTermReportRow` across all pages.
+        """
+        return self._iter_report_rows(
+            "searchterms/query",
+            request,
+            BrandsSearchTermReportResponse,
+            BrandsSearchTermReportRow,
+            page_size,
+        )
+
+    def iter_search_terms_async(
+        self,
+        request: BrandsReportingRequest | None = None,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[BrandsSearchTermReportRow]:
+        """Iterate over all Apple Maps search term report rows asynchronously.
+
+        Args:
+            request: Report parameters; ``pagination`` is overridden.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`BrandsSearchTermReportRow` across all pages.
+        """
+        return self._iter_report_rows_async(
+            "searchterms/query",
+            request,
+            BrandsSearchTermReportResponse,
+            BrandsSearchTermReportRow,
+            page_size,
         )

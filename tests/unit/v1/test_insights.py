@@ -420,3 +420,73 @@ def test_impression_share_row_coerces_int_promoted_object_id() -> None:
 
     row = ImpressionShareRow.model_validate({"promotedObjectId": 1579138717, "rank": 1})
     assert row.promoted_object_id == "1579138717"
+
+
+class TestInsightAutoPagination:
+    """Tests for iter_impression_share and iter_search_term_popularity."""
+
+    def test_iter_impression_share_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_impression_share pages until totalCount is reached."""
+        httpx_mock.add_response(
+            url=IMPRESSION_SHARE_URL,
+            json={
+                "result": {"rows": [{"searchTerm": "alpha"}, {"searchTerm": "beta"}]},
+                "pagination": {"offset": 0, "pageSize": 2, "totalCount": 3},
+            },
+        )
+        httpx_mock.add_response(
+            url=IMPRESSION_SHARE_URL,
+            json={
+                "result": {"rows": [{"searchTerm": "gamma"}]},
+                "pagination": {"offset": 2, "pageSize": 2, "totalCount": 3},
+            },
+        )
+        req = ImpressionShareQueryRequest(
+            filters=[InsightsFilter(field="promotedObjectId", operator="EQUALS", value="111")],
+            time_range=ImpressionShareTimeRange(
+                start=date(2026, 7, 1),
+                end=date(2026, 7, 7),
+                granularity=ImpressionShareGranularity.DAILY,
+            ),
+        )
+        terms = [
+            row.search_term
+            for row in InsightResource(v1_client).iter_impression_share(req, page_size=2)
+        ]
+        assert terms == ["alpha", "beta", "gamma"]
+
+    async def test_iter_search_term_popularity_async_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_search_term_popularity_async walks pages asynchronously."""
+        httpx_mock.add_response(
+            url=POPULARITY_URL,
+            json={
+                "result": {"rows": [{"searchTerm": "coffee"}]},
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=POPULARITY_URL,
+            json={
+                "result": {"rows": [{"searchTerm": "espresso"}]},
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        req = SearchTermPopularityQueryRequest(
+            fields=["searchPopularity1to100"],
+            time_range=SearchTermPopularityTimeRange(
+                start=date(2026, 7, 5),
+                end=date(2026, 7, 11),
+                granularity=SearchTermPopularityGranularity.WEEKLY_SUN_SAT,
+            ),
+        )
+        terms = [
+            row.search_term
+            async for row in InsightResource(v1_client).iter_search_term_popularity_async(
+                req, page_size=1
+            )
+        ]
+        assert terms == ["coffee", "espresso"]

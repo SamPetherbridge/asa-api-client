@@ -7,6 +7,7 @@ holding a ``rows`` array (not a bare list), so this resource parses
 pages itself instead of using the query mixin.
 """
 
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, TypeVar
 
 from asa_api_client.v1.models.base import V1Model, V1Page, V1Pagination
@@ -139,3 +140,129 @@ class InsightResource(
             "POST", _SEARCH_TERM_POPULARITY_PATH, json=self._dump(request)
         )
         return self._rows_page(SearchTermPopularityRow, data)
+
+    @staticmethod
+    def _page_has_more(page: V1Page[M], offset: int, page_size: int) -> bool:
+        """Determine whether another insights page remains on the server."""
+        if not page.result:
+            return False
+        if page.pagination is not None and page.pagination.total_count is not None:
+            return offset + len(page.result) < page.pagination.total_count
+        return len(page.result) >= page_size
+
+    def _iter_rows(
+        self,
+        path: str,
+        request: V1Model,
+        model: type[M],
+        page_size: int,
+    ) -> Iterator[M]:
+        """Iterate across pages of an insights query endpoint."""
+        base_payload = self._dump(request)
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = self._request("POST", path, json=payload)
+            page = self._rows_page(model, data)
+            yield from page
+            if not self._page_has_more(page, offset, page_size):
+                break
+            offset += len(page)
+
+    async def _iter_rows_async(
+        self,
+        path: str,
+        request: V1Model,
+        model: type[M],
+        page_size: int,
+    ) -> AsyncIterator[M]:
+        """Iterate across pages of an insights query endpoint asynchronously."""
+        base_payload = self._dump(request)
+        offset = 0
+        while True:
+            payload = {**base_payload, "pagination": {"offset": offset, "pageSize": page_size}}
+            data = await self._request_async("POST", path, json=payload)
+            page = self._rows_page(model, data)
+            for row in page:
+                yield row
+            if not self._page_has_more(page, offset, page_size):
+                break
+            offset += len(page)
+
+    def iter_impression_share(
+        self,
+        request: ImpressionShareQueryRequest,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[ImpressionShareRow]:
+        """Iterate over all impression share rows with automatic pagination.
+
+        Overrides ``request.pagination`` while preserving filters, sorting,
+        time range, and options.
+
+        Args:
+            request: The impression share query request.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`ImpressionShareRow` across all result pages.
+        """
+        return self._iter_rows(_IMPRESSION_SHARE_PATH, request, ImpressionShareRow, page_size)
+
+    def iter_impression_share_async(
+        self,
+        request: ImpressionShareQueryRequest,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[ImpressionShareRow]:
+        """Iterate over all impression share rows asynchronously.
+
+        Args:
+            request: The impression share query request.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`ImpressionShareRow` across all result pages.
+        """
+        return self._iter_rows_async(_IMPRESSION_SHARE_PATH, request, ImpressionShareRow, page_size)
+
+    def iter_search_term_popularity(
+        self,
+        request: SearchTermPopularityQueryRequest,
+        *,
+        page_size: int = 5000,
+    ) -> Iterator[SearchTermPopularityRow]:
+        """Iterate over all search term popularity rows with automatic pagination.
+
+        Overrides ``request.pagination`` while preserving fields, filters,
+        sorting, and time range.
+
+        Args:
+            request: The search term popularity query request.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`SearchTermPopularityRow` across all result pages.
+        """
+        return self._iter_rows(
+            _SEARCH_TERM_POPULARITY_PATH, request, SearchTermPopularityRow, page_size
+        )
+
+    def iter_search_term_popularity_async(
+        self,
+        request: SearchTermPopularityQueryRequest,
+        *,
+        page_size: int = 5000,
+    ) -> AsyncIterator[SearchTermPopularityRow]:
+        """Iterate over all search term popularity rows asynchronously.
+
+        Args:
+            request: The search term popularity query request.
+            page_size: Rows per page (up to 5,000).
+
+        Yields:
+            Each :class:`SearchTermPopularityRow` across all result pages.
+        """
+        return self._iter_rows_async(
+            _SEARCH_TERM_POPULARITY_PATH, request, SearchTermPopularityRow, page_size
+        )
