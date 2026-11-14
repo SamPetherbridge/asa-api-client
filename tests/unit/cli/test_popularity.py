@@ -389,7 +389,7 @@ class TestAnalyzeWiring:
         _mock_v5_api(httpx_mock)
         out = tmp_path / "report.xlsx"
 
-        result = runner.invoke(app, ["analyze", "--output", str(out)])
+        result = runner.invoke(app, ["analyze", "--api-version", "v5", "--output", str(out)])
 
         assert result.exit_code == 0, result.output
         combined = result.output + (result.stderr or "")
@@ -425,7 +425,7 @@ class TestAnalyzeWiring:
         _mock_v5_api(httpx_mock)
         out = tmp_path / "report.xlsx"
 
-        result = runner.invoke(app, ["analyze", "--output", str(out)])
+        result = runner.invoke(app, ["analyze", "--api-version", "v5", "--output", str(out)])
 
         assert result.exit_code == 0, result.output
         ws = load_workbook(out)["Search Popularity"]

@@ -1,6 +1,7 @@
 """The ``asa analyze`` command: options, orchestration, presentation."""
 
 import asyncio
+import os
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -74,6 +75,33 @@ def _fail(message: str) -> "typer.Exit":
     return typer.Exit(code=1)
 
 
+def _resolve_v1_account(client: AppleAdsClient) -> None:
+    """Auto-select an ad account from ACLs when ``ASA_AD_ACCOUNT_ID`` is unset."""
+    if client.ad_account_id is not None:
+        return
+    accounts = [
+        acl.ad_account
+        for acl in client.acls.list()
+        if acl.ad_account is not None and acl.ad_account.id is not None
+    ]
+    org_id = os.environ.get("ASA_ORG_ID")
+    selected = next((a for a in accounts if str(a.id) == org_id), None) if org_id else None
+    if selected is None and len(accounts) == 1:
+        selected = accounts[0]
+    if selected is None:
+        if not accounts:
+            raise ConfigurationError(
+                "ASA_AD_ACCOUNT_ID is not set and no accessible ad accounts were returned "
+                "by /v1/acls."
+            )
+        choices = ", ".join(f"{a.id} ({a.name})" if a.name else str(a.id) for a in accounts)
+        raise ConfigurationError(
+            f"ASA_AD_ACCOUNT_ID is not set and multiple ad accounts are accessible ({choices}). "
+            "Set ASA_AD_ACCOUNT_ID to select one."
+        )
+    client.ad_account_id = str(selected.id)
+
+
 async def _fetch(
     client: fetch.FetchClient,
     meta: pd.DataFrame,
@@ -132,7 +160,7 @@ def analyze(
     api_version: Annotated[
         ApiVersion,
         typer.Option("--api-version", help="Apple Ads API version to fetch with."),
-    ] = ApiVersion.V5,
+    ] = ApiVersion.V1,
 ) -> None:
     """Generate an Excel performance analysis workbook."""
     today = datetime.now(tz=UTC).date()
@@ -147,12 +175,20 @@ def analyze(
         raise typer.BadParameter(str(exc)) from exc
 
     client: AppleSearchAdsClient | V1FetchAdapter
+    resolved_account_id: str | None = None
     try:
         if api_version is ApiVersion.V1:
-            client = V1FetchAdapter(AppleAdsClient.from_env())
+            v1_client = AppleAdsClient.from_env()
+            try:
+                _resolve_v1_account(v1_client)
+            except BaseException:
+                v1_client.close()
+                raise
+            resolved_account_id = v1_client.ad_account_id
+            client = V1FetchAdapter(v1_client)
         else:
             client = AppleSearchAdsClient.from_env()
-    except ConfigurationError as exc:
+    except (ConfigurationError, AppleSearchAdsError) as exc:
         raise _fail(str(exc)) from exc
 
     try:
@@ -212,8 +248,17 @@ def analyze(
 
     # The popularity sheet is enrichment via the v1 insights API; it
     # must never break (or fail) an otherwise successful analyze run.
+    def _popularity_factory() -> AppleAdsClient:
+        pop_client = AppleAdsClient.from_env()
+        if pop_client.ad_account_id is None and resolved_account_id is not None:
+            pop_client.ad_account_id = resolved_account_id
+        return pop_client
+
     try:
-        popularity_frame, popularity_notes = popularity.build_popularity(result)
+        popularity_frame, popularity_notes = popularity.build_popularity(
+            result,
+            client_factory=_popularity_factory if resolved_account_id is not None else None,
+        )
     except Exception as exc:  # nothing from this sheet may abort the workbook
         popularity_frame, popularity_notes = pd.DataFrame(), []
         _err.print(f"[yellow]Warning:[/yellow] Search Popularity sheet skipped: {exc}")

@@ -402,19 +402,8 @@ class TestLifecycle:
 class TestAnalyzeFlag:
     """--api-version wiring in the analyze command."""
 
-    def test_v1_flag_constructs_v1_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """--api-version v1 builds the client via AppleAdsClient.from_env."""
-        sentinel = RuntimeError("v1-from-env-called")
-
-        def boom(_cls: type[AppleAdsClient]) -> AppleAdsClient:
-            raise sentinel
-
-        monkeypatch.setattr(AppleAdsClient, "from_env", classmethod(boom))
-        result = runner.invoke(app, ["analyze", "--api-version", "v1"])
-        assert result.exception is sentinel
-
-    def test_default_stays_on_v5(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Without the flag, only AppleSearchAdsClient.from_env is used."""
+    def test_default_uses_v1(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Without the flag, AppleAdsClient.from_env (v1) is used."""
         v5_sentinel = RuntimeError("v5-from-env-called")
         v1_sentinel = RuntimeError("v1-from-env-called")
 
@@ -427,7 +416,18 @@ class TestAnalyzeFlag:
         monkeypatch.setattr(AppleSearchAdsClient, "from_env", classmethod(v5_boom))
         monkeypatch.setattr(AppleAdsClient, "from_env", classmethod(v1_boom))
         result = runner.invoke(app, ["analyze"])
-        assert result.exception is v5_sentinel
+        assert result.exception is v1_sentinel
+
+    def test_v5_flag_constructs_v5_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """--api-version v5 builds the legacy client via AppleSearchAdsClient.from_env."""
+        sentinel = RuntimeError("v5-from-env-called")
+
+        def boom(_cls: type[AppleSearchAdsClient]) -> AppleSearchAdsClient:
+            raise sentinel
+
+        monkeypatch.setattr(AppleSearchAdsClient, "from_env", classmethod(boom))
+        result = runner.invoke(app, ["analyze", "--api-version", "v5"])
+        assert result.exception is sentinel
 
 
 class TestMoneyPayload:

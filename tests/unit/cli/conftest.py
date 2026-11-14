@@ -31,6 +31,7 @@ def asa_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("ASA_ORG_ID", "999")
     monkeypatch.setenv("ASA_PRIVATE_KEY", pem)
     monkeypatch.delenv("ASA_PRIVATE_KEY_PATH", raising=False)
+    monkeypatch.delenv("ASA_AD_ACCOUNT_ID", raising=False)
 
 
 def token_json() -> dict[str, Any]:
@@ -77,7 +78,7 @@ def report_row(
         metadata: The row metadata (campaignId etc.).
         days: Tuples of (date, impressions, taps, installs, spend).
     """
-    granularity = [
+    granularity: list[dict[str, Any]] = [
         {
             "date": d,
             "impressions": imp,
