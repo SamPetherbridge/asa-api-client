@@ -1,7 +1,6 @@
 """The ``asa analyze`` command: options, orchestration, presentation."""
 
 import asyncio
-import os
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -77,29 +76,7 @@ def _fail(message: str) -> "typer.Exit":
 
 def _resolve_v1_account(client: AppleAdsClient) -> None:
     """Auto-select an ad account from ACLs when ``ASA_AD_ACCOUNT_ID`` is unset."""
-    if client.ad_account_id is not None:
-        return
-    accounts = [
-        acl.ad_account
-        for acl in client.acls.list()
-        if acl.ad_account is not None and acl.ad_account.id is not None
-    ]
-    org_id = os.environ.get("ASA_ORG_ID")
-    selected = next((a for a in accounts if str(a.id) == org_id), None) if org_id else None
-    if selected is None and len(accounts) == 1:
-        selected = accounts[0]
-    if selected is None:
-        if not accounts:
-            raise ConfigurationError(
-                "ASA_AD_ACCOUNT_ID is not set and no accessible ad accounts were returned "
-                "by /v1/acls."
-            )
-        choices = ", ".join(f"{a.id} ({a.name})" if a.name else str(a.id) for a in accounts)
-        raise ConfigurationError(
-            f"ASA_AD_ACCOUNT_ID is not set and multiple ad accounts are accessible ({choices}). "
-            "Set ASA_AD_ACCOUNT_ID to select one."
-        )
-    client.ad_account_id = str(selected.id)
+    client.resolve_ad_account()
 
 
 async def _fetch(

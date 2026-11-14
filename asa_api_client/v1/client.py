@@ -9,6 +9,8 @@ both clients. The v1 API scopes requests to an *ad account* via the
 ``X-AP-Context: adAccountId=...`` header instead of v5's ``orgId``.
 """
 
+import os
+from collections.abc import Sequence
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -20,6 +22,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from asa_api_client.auth import Authenticator
 from asa_api_client.exceptions import ConfigurationError
 from asa_api_client.logging import get_logger
+from asa_api_client.v1.models.ad_accounts import UserAcl
 from asa_api_client.v1.resources.ad_accounts import (
     AclResource,
     AdAccountResource,
@@ -29,6 +32,11 @@ from asa_api_client.v1.resources.ad_accounts import (
 from asa_api_client.v1.resources.ad_groups import AdGroupResource
 from asa_api_client.v1.resources.ads import AdResource
 from asa_api_client.v1.resources.apps import AppResource
+from asa_api_client.v1.resources.base import (
+    DEFAULT_INITIAL_DELAY,
+    DEFAULT_MAX_DELAY,
+    DEFAULT_MAX_RETRIES,
+)
 from asa_api_client.v1.resources.brands import (
     BrandRejectionReasonResource,
     BrandResource,
@@ -133,6 +141,10 @@ class AppleAdsClient:
         private_key_path: Path | str | None = None,
         base_url: str = DEFAULT_V1_BASE_URL,
         timeout: float = 30.0,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_initial_delay: float = DEFAULT_INITIAL_DELAY,
+        retry_max_delay: float = DEFAULT_MAX_DELAY,
+        retry_jitter: bool = True,
     ) -> None:
         """Initialize the Apple Ads Platform API v1 client.
 
@@ -150,13 +162,28 @@ class AppleAdsClient:
             private_key_path: Path to the private key PEM file.
             base_url: The API base URL. Defaults to the v1 API.
             timeout: Request timeout in seconds.
+            max_retries: Maximum retry attempts on rate limiting (429) or
+                transient failures. Set to 0 to disable retries.
+            retry_initial_delay: Initial exponential-backoff delay in seconds.
+            retry_max_delay: Upper bound on retry delay in seconds.
+            retry_jitter: Whether to add bounded random jitter to computed
+                backoff delays to prevent synchronized retry spikes.
 
         Raises:
-            ConfigurationError: If credentials are invalid or missing.
+            ConfigurationError: If credentials or retry settings are invalid.
         """
+        if max_retries < 0:
+            raise ConfigurationError("max_retries must be >= 0")
+        if retry_initial_delay < 0 or retry_max_delay < 0:
+            raise ConfigurationError("retry_initial_delay and retry_max_delay must be >= 0")
+
         self.ad_account_id = str(ad_account_id) if ad_account_id is not None else None
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self.max_retries = max_retries
+        self.retry_initial_delay = retry_initial_delay
+        self.retry_max_delay = retry_max_delay
+        self.retry_jitter = retry_jitter
 
         self._authenticator = Authenticator(
             client_id=client_id,
@@ -170,8 +197,19 @@ class AppleAdsClient:
         # HTTP clients (created lazily)
         self._http_client: httpx.Client | None = None
         self._async_http_client: httpx.AsyncClient | None = None
+        self._owns_http_clients: bool = True
+        self._parent_client: AppleAdsClient | None = None
 
-        # Initialize resources
+        self._init_resources()
+
+        logger.info(
+            "AppleAdsClient initialized for ad_account_id=%s, base_url=%s",
+            self.ad_account_id,
+            base_url,
+        )
+
+    def _init_resources(self) -> None:
+        """Bind resource views to this client instance."""
         self._campaigns = CampaignResource(self)
         self._ad_accounts = AdAccountResource(self)
         self._acls = AclResource(self)
@@ -200,12 +238,6 @@ class AppleAdsClient:
         self._change_history = ChangeHistoryResource(self)
         self._bulk = BulkOperationResource(self)
 
-        logger.info(
-            "AppleAdsClient initialized for ad_account_id=%s, base_url=%s",
-            self.ad_account_id,
-            base_url,
-        )
-
     @classmethod
     def from_env(
         cls,
@@ -213,6 +245,10 @@ class AppleAdsClient:
         env_file: str | Path | None = ".env",
         base_url: str = DEFAULT_V1_BASE_URL,
         timeout: float = 30.0,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_initial_delay: float = DEFAULT_INITIAL_DELAY,
+        retry_max_delay: float = DEFAULT_MAX_DELAY,
+        retry_jitter: bool = True,
     ) -> Self:
         """Create a client from environment variables and .env file.
 
@@ -231,6 +267,11 @@ class AppleAdsClient:
                 loading from file. Defaults to ".env".
             base_url: The API base URL.
             timeout: Request timeout in seconds.
+            max_retries: Maximum retry attempts on transient failures.
+            retry_initial_delay: Initial exponential-backoff delay in seconds.
+            retry_max_delay: Upper bound on retry delay in seconds.
+            retry_jitter: Whether to add bounded random jitter to computed
+                backoff delays.
 
         Returns:
             A configured AppleAdsClient instance.
@@ -265,7 +306,146 @@ class AppleAdsClient:
             private_key_path=settings.private_key_path,
             base_url=base_url,
             timeout=timeout,
+            max_retries=max_retries,
+            retry_initial_delay=retry_initial_delay,
+            retry_max_delay=retry_max_delay,
+            retry_jitter=retry_jitter,
         )
+
+    def with_account(self, ad_account_id: str | int) -> Self:
+        """Return a lightweight view scoped to a different ad account.
+
+        The returned client shares the parent client's authenticator
+        (including its cached OAuth access token and refresh locks) and
+        HTTP connection pools without mutating ``self.ad_account_id``.
+        Closing a scoped client (or using it in a ``with`` / ``async with``
+        block) leaves the parent client's shared HTTP pools open.
+
+        Args:
+            ad_account_id: Ad account ID to scope requests to.
+
+        Returns:
+            A scoped ``AppleAdsClient`` sharing credentials and transport.
+
+        Raises:
+            ConfigurationError: If ``ad_account_id`` is empty.
+
+        Example:
+            Query multiple accounts concurrently::
+
+                acls = await client.acls.list_async()
+                pages = await asyncio.gather(
+                    *(
+                        client.with_account(acl.ad_account_id).campaigns.query_async()
+                        for acl in acls
+                        if acl.ad_account_id is not None
+                    )
+                )
+        """
+        account_str = str(ad_account_id).strip()
+        if not account_str:
+            raise ConfigurationError("ad_account_id must not be empty")
+
+        root = self._parent_client if self._parent_client is not None else self
+        scoped = type(self).__new__(type(self))
+        scoped.ad_account_id = account_str
+        scoped._base_url = root._base_url
+        scoped._timeout = root._timeout
+        scoped.max_retries = root.max_retries
+        scoped.retry_initial_delay = root.retry_initial_delay
+        scoped.retry_max_delay = root.retry_max_delay
+        scoped.retry_jitter = root.retry_jitter
+        scoped._authenticator = root._authenticator
+        scoped._http_client = None
+        scoped._async_http_client = None
+        scoped._owns_http_clients = False
+        scoped._parent_client = root
+        scoped._init_resources()
+        return scoped
+
+    def _select_ad_account(
+        self,
+        acls: Sequence[UserAcl],
+        *,
+        prefer_org_id: int | str | None = None,
+    ) -> str:
+        """Pick one ad account from ACL entries and assign ``self.ad_account_id``."""
+        accounts = [
+            acl.ad_account
+            for acl in acls
+            if acl.ad_account is not None and acl.ad_account.id is not None
+        ]
+
+        preferred: str | None
+        if prefer_org_id is not None:
+            preferred = str(prefer_org_id)
+        elif os.environ.get("ASA_ORG_ID"):
+            preferred = os.environ.get("ASA_ORG_ID")
+        elif self._authenticator.org_id:
+            preferred = str(self._authenticator.org_id)
+        else:
+            preferred = None
+
+        selected = (
+            next((a for a in accounts if str(a.id) == preferred), None) if preferred else None
+        )
+        if selected is None and len(accounts) == 1:
+            selected = accounts[0]
+        if selected is None:
+            if not accounts:
+                raise ConfigurationError(
+                    "ASA_AD_ACCOUNT_ID is not set and no accessible ad accounts were returned "
+                    "by /v1/acls."
+                )
+            choices = ", ".join(f"{a.id} ({a.name})" if a.name else str(a.id) for a in accounts)
+            raise ConfigurationError(
+                f"ASA_AD_ACCOUNT_ID is not set and multiple ad accounts are accessible "
+                f"({choices}). Set ASA_AD_ACCOUNT_ID to select one."
+            )
+
+        self.ad_account_id = str(selected.id)
+        return self.ad_account_id
+
+    def resolve_ad_account(self, *, prefer_org_id: int | str | None = None) -> str:
+        """Discover and assign ``ad_account_id`` via ``/v1/acls`` if unset.
+
+        When ``ad_account_id`` is already configured on the client, returns
+        it without making a network call. Otherwise fetches accessible ACLs
+        and selects either the account matching ``prefer_org_id`` (falling
+        back to ``ASA_ORG_ID`` / ``org_id``) or the sole accessible account.
+
+        Args:
+            prefer_org_id: Optional account/org ID to prefer when multiple
+                accounts are accessible.
+
+        Returns:
+            The resolved ``ad_account_id`` string.
+
+        Raises:
+            ConfigurationError: If no accounts are accessible or multiple
+                accounts exist with no unambiguous match.
+        """
+        if self.ad_account_id is not None:
+            return self.ad_account_id
+        return self._select_ad_account(self.acls.list(), prefer_org_id=prefer_org_id)
+
+    async def resolve_ad_account_async(self, *, prefer_org_id: int | str | None = None) -> str:
+        """Discover and assign ``ad_account_id`` via ``/v1/acls`` asynchronously.
+
+        Args:
+            prefer_org_id: Optional account/org ID to prefer when multiple
+                accounts are accessible.
+
+        Returns:
+            The resolved ``ad_account_id`` string.
+
+        Raises:
+            ConfigurationError: If no accounts are accessible or multiple
+                accounts exist with no unambiguous match.
+        """
+        if self.ad_account_id is not None:
+            return self.ad_account_id
+        return self._select_ad_account(await self.acls.list_async(), prefer_org_id=prefer_org_id)
 
     @property
     def campaigns(self) -> CampaignResource:
@@ -430,6 +610,8 @@ class AppleAdsClient:
         Returns:
             The httpx.Client instance.
         """
+        if self._parent_client is not None:
+            return self._parent_client._get_http_client()
         if self._http_client is None:
             self._http_client = httpx.Client(
                 timeout=self._timeout,
@@ -443,6 +625,8 @@ class AppleAdsClient:
         Returns:
             The httpx.AsyncClient instance.
         """
+        if self._parent_client is not None:
+            return self._parent_client._get_async_http_client()
         if self._async_http_client is None:
             self._async_http_client = httpx.AsyncClient(
                 timeout=self._timeout,
@@ -456,6 +640,10 @@ class AppleAdsClient:
         This should be called when you're done using the client.
         Alternatively, use the client as a context manager.
         """
+        if not self._owns_http_clients:
+            logger.debug("Scoped client closed (shared transport retained)")
+            return
+
         if self._http_client is not None:
             self._http_client.close()
             self._http_client = None
@@ -472,6 +660,10 @@ class AppleAdsClient:
 
         This should be called when using the client in async mode.
         """
+        if not self._owns_http_clients:
+            logger.debug("Scoped client closed asynchronously (shared transport retained)")
+            return
+
         if self._http_client is not None:
             self._http_client.close()
             self._http_client = None

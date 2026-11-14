@@ -11,9 +11,11 @@ from pytest_httpx import HTTPXMock
 from asa_api_client.exceptions import (
     AuthenticationError,
     ConfigurationError,
+    NetworkError,
     NotFoundError,
     PartialFailureError,
     RateLimitError,
+    ServerError,
     ValidationError,
 )
 from asa_api_client.v1.models.base import V1Model
@@ -64,23 +66,27 @@ class ContextFreeResource(DummyResource):
 
 
 class StubAuthenticator:
-    """Authenticator stub recording invalidations."""
+    """Authenticator stub recording invalidations and token rotations."""
 
     def __init__(self) -> None:
         """Initialize with no invalidations recorded."""
         self.invalidated = False
+        self.generation = 1
 
     def get_access_token(self, _http_client: Any) -> Any:
-        """Return a stub token."""
-        return SimpleNamespace(authorization_header="Bearer test-token")
+        """Return a stub token reflecting the current generation."""
+        suffix = "" if self.generation == 1 else f"-v{self.generation}"
+        return SimpleNamespace(authorization_header=f"Bearer test-token{suffix}")
 
     async def get_access_token_async(self, _http_client: Any) -> Any:
         """Return a stub token asynchronously."""
-        return SimpleNamespace(authorization_header="Bearer test-token")
+        suffix = "" if self.generation == 1 else f"-v{self.generation}"
+        return SimpleNamespace(authorization_header=f"Bearer test-token{suffix}")
 
     def invalidate_token(self) -> None:
-        """Record that the token was invalidated."""
+        """Record that the token was invalidated and advance generation."""
         self.invalidated = True
+        self.generation += 1
 
 
 def make_client(ad_account_id: str | None = "12345") -> Any:
@@ -207,16 +213,54 @@ class TestErrorMapping:
         assert exc_info.value.field_errors == {"budget": ["unknown field"]}
 
     def test_401_invalidates_token(self, httpx_mock: HTTPXMock) -> None:
-        """Test 401 raises AuthenticationError and invalidates the token."""
+        """Test persistent 401 raises AuthenticationError after a single token refresh."""
+        for _ in range(2):
+            httpx_mock.add_response(
+                url=f"{BASE_URL}/dummies/1",
+                status_code=401,
+                json={"error": {"message": "expired"}},
+            )
+        client = make_client()
+        with pytest.raises(AuthenticationError):
+            DummyResource(client).get(1)
+        assert client._authenticator.invalidated is True
+        assert len(httpx_mock.get_requests()) == 2
+
+    def test_401_refreshes_token_and_succeeds_on_retry(self, httpx_mock: HTTPXMock) -> None:
+        """Test a single transient 401 invalidates the token and retries with a fresh token."""
         httpx_mock.add_response(
             url=f"{BASE_URL}/dummies/1",
             status_code=401,
             json={"error": {"message": "expired"}},
         )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies/1",
+            json={"result": {"id": 1, "name": "Recovered"}},
+        )
         client = make_client()
-        with pytest.raises(AuthenticationError):
-            DummyResource(client).get(1)
-        assert client._authenticator.invalidated is True
+        item = DummyResource(client).get(1)
+        assert item.name == "Recovered"
+        first_req, second_req = httpx_mock.get_requests()
+        assert first_req.headers["Authorization"] == "Bearer test-token"
+        assert second_req.headers["Authorization"] == "Bearer test-token-v2"
+
+    async def test_401_refreshes_token_and_succeeds_async(self, httpx_mock: HTTPXMock) -> None:
+        """Test async requests also refresh once on 401 and send the fresh token."""
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies/1",
+            status_code=401,
+            json={"error": {"message": "expired"}},
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies/1",
+            json={"result": {"id": 1, "name": "RecoveredAsync"}},
+        )
+        client = make_client()
+        item = await DummyResource(client).get_async(1)
+        assert item.name == "RecoveredAsync"
+        first_req, second_req = httpx_mock.get_requests()
+        assert first_req.headers["Authorization"] == "Bearer test-token"
+        assert second_req.headers["Authorization"] == "Bearer test-token-v2"
 
     def test_429_exhausts_retries_then_raises(
         self, httpx_mock: HTTPXMock, monkeypatch: pytest.MonkeyPatch
@@ -258,6 +302,82 @@ class TestRetry:
         httpx_mock.add_response(url=f"{BASE_URL}/dummies/query", json={"result": [{"id": 1}]})
         page = DummyResource(make_client()).query()
         assert len(page) == 1
+
+    def test_non_idempotent_post_does_not_retry_on_5xx(
+        self, httpx_mock: HTTPXMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test mutation POST calls do not retry on 5xx to prevent duplicate writes."""
+        monkeypatch.setattr("asa_api_client.v1.resources.base.time.sleep", lambda _: None)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies",
+            status_code=503,
+            json={"error": {"message": "service unavailable"}},
+        )
+        with pytest.raises(ServerError):
+            DummyResource(make_client()).create(DummyModel(id=1, name="A"))
+        assert len(httpx_mock.get_requests()) == 1
+
+    def test_non_idempotent_post_does_not_retry_on_read_timeout(
+        self, httpx_mock: HTTPXMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test mutation POST calls do not retry after ReadTimeout."""
+        monkeypatch.setattr("asa_api_client.v1.resources.base.time.sleep", lambda _: None)
+        httpx_mock.add_exception(httpx.ReadTimeout("timed out"), url=f"{BASE_URL}/dummies")
+        with pytest.raises(NetworkError):
+            DummyResource(make_client()).create(DummyModel(id=1, name="A"))
+        assert len(httpx_mock.get_requests()) == 1
+
+    def test_non_idempotent_post_retries_on_429_and_connect_error(
+        self, httpx_mock: HTTPXMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test mutation POST calls still retry on 429 and ConnectError."""
+        monkeypatch.setattr("asa_api_client.v1.resources.base.time.sleep", lambda _: None)
+        httpx_mock.add_exception(httpx.ConnectError("refused"), url=f"{BASE_URL}/dummies")
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies",
+            status_code=429,
+            json={"error": {"message": "rate limited"}},
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies",
+            json={"result": {"id": 1, "name": "Created"}},
+        )
+        created = DummyResource(make_client()).create(DummyModel(id=1, name="Created"))
+        assert created.id == 1
+        assert len(httpx_mock.get_requests()) == 3
+
+    def test_retry_does_not_print_to_stderr(
+        self,
+        httpx_mock: HTTPXMock,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test sync retries log cleanly without printing directly to stderr."""
+        monkeypatch.delenv("ASA_DEBUG", raising=False)
+        monkeypatch.setattr("asa_api_client.v1.resources.base.time.sleep", lambda _: None)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/dummies/1",
+            status_code=429,
+            json={"error": {"message": "wait"}},
+        )
+        httpx_mock.add_response(url=f"{BASE_URL}/dummies/1", json={"result": {"id": 1}})
+        DummyResource(make_client()).get(1)
+        assert capsys.readouterr().err == ""
+
+    def test_client_retry_settings_and_jitter(self) -> None:
+        """Test client-level retry settings and bounded jitter calculation."""
+        client = make_client()
+        client.max_retries = 2
+        client.retry_initial_delay = 10.0
+        client.retry_max_delay = 15.0
+        client.retry_jitter = True
+        resource = DummyResource(client)
+
+        assert resource._max_retries == 2
+        delay0 = resource._calculate_retry_delay(0)
+        assert 8.5 <= delay0 <= 11.5
+        delay2 = resource._calculate_retry_delay(2)
+        assert 12.75 <= delay2 <= 15.0
 
 
 class TestQueryAndPagination:

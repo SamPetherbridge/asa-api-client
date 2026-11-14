@@ -11,6 +11,7 @@ on HTTP 2xx — so partial failures can never masquerade as success.
 
 import asyncio
 import os
+import random
 import sys
 import time
 from collections.abc import AsyncIterator, Iterator
@@ -49,7 +50,10 @@ DEFAULT_MAX_RETRIES = 5
 DEFAULT_INITIAL_DELAY = 5.0  # seconds - Apple rate limits often need longer waits
 DEFAULT_MAX_DELAY = 120.0  # seconds
 DEFAULT_BACKOFF_FACTOR = 2.0
-RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+DEFAULT_JITTER_MIN = 0.85
+DEFAULT_JITTER_MAX = 1.15
+SERVER_ERROR_STATUS_CODES = {500, 502, 503, 504}
+RETRYABLE_STATUS_CODES = {429, *SERVER_ERROR_STATUS_CODES}
 
 # Request counter for ASA_DEBUG output
 _request_count = 0
@@ -105,6 +109,79 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
     def _async_http_client(self) -> httpx.AsyncClient:
         """Get the async HTTP client."""
         return self._client._get_async_http_client()
+
+    @property
+    def _max_retries(self) -> int:
+        """Configured maximum retry count on the client, or the default."""
+        return int(getattr(self._client, "max_retries", DEFAULT_MAX_RETRIES))
+
+    @property
+    def _retry_initial_delay(self) -> float:
+        """Configured initial backoff delay in seconds."""
+        return float(getattr(self._client, "retry_initial_delay", DEFAULT_INITIAL_DELAY))
+
+    @property
+    def _retry_max_delay(self) -> float:
+        """Configured maximum backoff delay in seconds."""
+        return float(getattr(self._client, "retry_max_delay", DEFAULT_MAX_DELAY))
+
+    @property
+    def _retry_jitter(self) -> bool:
+        """Whether random jitter is applied to computed backoff delays."""
+        return bool(getattr(self._client, "retry_jitter", False))
+
+    def _is_idempotent_request(self, method: str, path: str = "") -> bool:
+        """Determine whether retrying after an ambiguous failure is safe.
+
+        ``GET``, ``PUT``, ``DELETE``, ``HEAD``, and ``OPTIONS`` are idempotent,
+        as are read-only ``POST`` query/search endpoints across v1. Mutation
+        ``POST`` calls (entity creation, bulk writes, recommendation actions)
+        are non-idempotent and must not retry after ``5xx`` or read timeouts.
+
+        Args:
+            method: HTTP method name.
+            path: Path segment relative to ``base_path``.
+
+        Returns:
+            True if the request can safely be retried on ``5xx`` or transport
+            read errors.
+        """
+        upper = method.upper()
+        if upper in {"GET", "HEAD", "OPTIONS", "PUT", "DELETE"}:
+            return True
+        if upper != "POST":
+            return False
+
+        rel_path = "/".join(part for part in (self.base_path.strip("/"), path.strip("/")) if part)
+        return (
+            rel_path in {"query", "lookup"}
+            or rel_path.endswith(("/query", "/lookup"))
+            or rel_path.startswith(("reports/", "insights/", "suggestions/", "search/"))
+        )
+
+    @staticmethod
+    def _should_retry_status(status_code: int, *, is_idempotent: bool) -> bool:
+        """Check whether an HTTP status code warrants a retry.
+
+        ``429`` is always retryable because rate limiting rejects requests
+        before mutating state. ``5xx`` responses are retried only for
+        idempotent requests.
+        """
+        if status_code == 429:
+            return True
+        return is_idempotent and status_code in SERVER_ERROR_STATUS_CODES
+
+    @staticmethod
+    def _should_retry_exception(exc: httpx.RequestError, *, is_idempotent: bool) -> bool:
+        """Check whether a transport exception warrants a retry.
+
+        Connection-establishment failures happen before request bytes execute
+        on the server and are always safe to retry; post-connection errors
+        (such as read timeouts) are retried only for idempotent requests.
+        """
+        if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
+            return True
+        return is_idempotent
 
     def _build_url(self, path: str = "") -> str:
         """Build the full API URL.
@@ -303,7 +380,8 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
     ) -> float:
         """Calculate delay before next retry attempt.
 
-        Uses exponential backoff, respecting Retry-After header if present.
+        Uses exponential backoff with optional bounded jitter, respecting
+        ``Retry-After`` header values when present.
 
         Args:
             attempt: Current attempt number (0-indexed).
@@ -312,16 +390,19 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
         Returns:
             Delay in seconds before next retry.
         """
+        max_delay = self._retry_max_delay
         if response is not None:
             retry_after = response.headers.get("Retry-After")
             if retry_after:
                 try:
-                    return min(float(retry_after), DEFAULT_MAX_DELAY)
+                    return min(max(0.0, float(retry_after)), max_delay)
                 except ValueError:
                     pass
 
-        delay = DEFAULT_INITIAL_DELAY * (DEFAULT_BACKOFF_FACTOR**attempt)
-        return min(delay, DEFAULT_MAX_DELAY)
+        delay = min(self._retry_initial_delay * (DEFAULT_BACKOFF_FACTOR**attempt), max_delay)
+        if self._retry_jitter and delay > 0:
+            delay = min(delay * random.uniform(DEFAULT_JITTER_MIN, DEFAULT_JITTER_MAX), max_delay)
+        return delay
 
     def _request(
         self,
@@ -330,20 +411,23 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
         *,
         json: dict[str, Any] | list[dict[str, Any]] | list[int] | None = None,
         params: dict[str, Any] | None = None,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = None,
     ) -> dict[str, Any]:
         """Make a synchronous API request with automatic retry.
 
-        Automatically retries on rate limiting (429) and server errors
-        (5xx) with exponential backoff. This includes POST query
-        endpoints, which are idempotent reads.
+        Automatically retries on rate limiting (429) and connection failures
+        for all methods, and on server errors (5xx) and transport read errors
+        for idempotent requests (including ``POST .../query`` endpoints). A
+        single ``401`` response invalidates the cached OAuth token and retries
+        once with a freshly requested token.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE).
             path: URL path to append to base_path.
             json: JSON body to send.
             params: Query parameters.
-            max_retries: Maximum number of retry attempts.
+            max_retries: Maximum number of retry attempts. Defaults to the
+                client's ``max_retries`` setting.
 
         Returns:
             The parsed JSON response.
@@ -354,8 +438,9 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
         global _request_count
         _request_count += 1
 
+        effective_max_retries = self._max_retries if max_retries is None else max_retries
+        is_idempotent = self._is_idempotent_request(method, path)
         url = self._build_url(path)
-        headers = self._get_headers()
 
         if os.environ.get("ASA_DEBUG"):
             short_url = url.replace("https://api.ads.apple.com/v1/", "")
@@ -363,7 +448,10 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
 
         logger.debug("%s %s", method, url)
 
-        for attempt in range(max_retries + 1):
+        attempt = 0
+        refreshed_after_401 = False
+        while True:
+            headers = self._get_headers()
             try:
                 response = self._http_client.request(
                     method,
@@ -373,32 +461,45 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
                     headers=headers,
                 )
             except httpx.RequestError as e:
-                if attempt < max_retries:
+                if attempt < effective_max_retries and self._should_retry_exception(
+                    e, is_idempotent=is_idempotent
+                ):
                     delay = self._calculate_retry_delay(attempt)
                     logger.warning(
                         "Request failed (attempt %d/%d), retrying in %.1fs: %s",
                         attempt + 1,
-                        max_retries + 1,
+                        effective_max_retries + 1,
                         delay,
                         str(e),
                     )
                     time.sleep(delay)
+                    attempt += 1
                     continue
                 raise NetworkError(f"Request failed: {e}") from e
 
-            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+            if response.status_code == 401 and not refreshed_after_401:
+                self._client._authenticator.invalidate_token()
+                refreshed_after_401 = True
+                logger.info(
+                    "Received 401 for %s %s; refreshing access token and retrying once",
+                    method,
+                    url,
+                )
+                continue
+
+            if attempt < effective_max_retries and self._should_retry_status(
+                response.status_code, is_idempotent=is_idempotent
+            ):
                 delay = self._calculate_retry_delay(attempt, response)
                 logger.warning(
                     "Received %d (attempt %d/%d), retrying in %.1fs",
                     response.status_code,
                     attempt + 1,
-                    max_retries + 1,
+                    effective_max_retries + 1,
                     delay,
                 )
-                msg = f"⏳ Rate limited ({response.status_code}), "
-                msg += f"attempt {attempt + 1}/{max_retries + 1}, retrying in {delay:.0f}s..."
-                print(msg, file=sys.stderr)
                 time.sleep(delay)
+                attempt += 1
                 continue
 
             if response.status_code >= 400:
@@ -413,8 +514,6 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
             self._check_body_error(result, response.status_code)
             return result
 
-        raise NetworkError("Request failed after all retries")
-
     async def _request_async(
         self,
         method: str,
@@ -422,7 +521,7 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
         *,
         json: dict[str, Any] | list[dict[str, Any]] | list[int] | None = None,
         params: dict[str, Any] | None = None,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = None,
     ) -> dict[str, Any]:
         """Make an asynchronous API request with automatic retry.
 
@@ -431,7 +530,8 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
             path: URL path to append to base_path.
             json: JSON body to send.
             params: Query parameters.
-            max_retries: Maximum number of retry attempts.
+            max_retries: Maximum number of retry attempts. Defaults to the
+                client's ``max_retries`` setting.
 
         Returns:
             The parsed JSON response.
@@ -439,12 +539,16 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
         Raises:
             AppleSearchAdsError: If the request fails after all retries.
         """
+        effective_max_retries = self._max_retries if max_retries is None else max_retries
+        is_idempotent = self._is_idempotent_request(method, path)
         url = self._build_url(path)
-        headers = await self._get_headers_async()
 
         logger.debug("%s %s (async)", method, url)
 
-        for attempt in range(max_retries + 1):
+        attempt = 0
+        refreshed_after_401 = False
+        while True:
+            headers = await self._get_headers_async()
             try:
                 response = await self._async_http_client.request(
                     method,
@@ -454,29 +558,45 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
                     headers=headers,
                 )
             except httpx.RequestError as e:
-                if attempt < max_retries:
+                if attempt < effective_max_retries and self._should_retry_exception(
+                    e, is_idempotent=is_idempotent
+                ):
                     delay = self._calculate_retry_delay(attempt)
                     logger.warning(
                         "Request failed (attempt %d/%d), retrying in %.1fs: %s",
                         attempt + 1,
-                        max_retries + 1,
+                        effective_max_retries + 1,
                         delay,
                         str(e),
                     )
                     await asyncio.sleep(delay)
+                    attempt += 1
                     continue
                 raise NetworkError(f"Request failed: {e}") from e
 
-            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+            if response.status_code == 401 and not refreshed_after_401:
+                self._client._authenticator.invalidate_token()
+                refreshed_after_401 = True
+                logger.info(
+                    "Received 401 for %s %s (async); refreshing access token and retrying once",
+                    method,
+                    url,
+                )
+                continue
+
+            if attempt < effective_max_retries and self._should_retry_status(
+                response.status_code, is_idempotent=is_idempotent
+            ):
                 delay = self._calculate_retry_delay(attempt, response)
                 logger.warning(
                     "Received %d (attempt %d/%d), retrying in %.1fs",
                     response.status_code,
                     attempt + 1,
-                    max_retries + 1,
+                    effective_max_retries + 1,
                     delay,
                 )
                 await asyncio.sleep(delay)
+                attempt += 1
                 continue
 
             if response.status_code >= 400:
@@ -490,8 +610,6 @@ class V1Resource(Generic[T, CreateT, UpdateT]):
             result: dict[str, Any] = response.json()
             self._check_body_error(result, response.status_code)
             return result
-
-        raise NetworkError("Request failed after all retries")
 
     def _parse_item(self, data: dict[str, Any]) -> T:
         """Parse a single-item response.

@@ -10,6 +10,8 @@ The authentication flow:
 4. Automatically refresh when the token expires
 """
 
+import asyncio
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -139,6 +141,8 @@ class Authenticator:
         self._access_token: AccessToken | None = None
         self._client_secret: str | None = None
         self._client_secret_expires_at: datetime | None = None
+        self._sync_lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
 
         logger.debug(
             "Authenticator initialized for client_id=%s, org_id=%d",
@@ -359,19 +363,29 @@ class Authenticator:
     def get_access_token(self, http_client: httpx.Client) -> AccessToken:
         """Get a valid access token, refreshing if necessary.
 
+        Thread-safe: concurrent callers share a single OAuth token refresh
+        when the cached token is missing or expired.
+
         Args:
             http_client: The HTTP client to use for token requests.
 
         Returns:
             A valid access token.
         """
-        if self._access_token is None or self._access_token.is_expired:
-            self._access_token = self._request_access_token(http_client)
+        token = self._access_token
+        if token is not None and not token.is_expired:
+            return token
 
-        return self._access_token
+        with self._sync_lock:
+            if self._access_token is None or self._access_token.is_expired:
+                self._access_token = self._request_access_token(http_client)
+            return self._access_token
 
     async def get_access_token_async(self, http_client: httpx.AsyncClient) -> AccessToken:
         """Get a valid access token asynchronously, refreshing if necessary.
+
+        Coroutine-safe: concurrent tasks (e.g. ``asyncio.gather``) share a
+        single OAuth token refresh when the cached token is missing or expired.
 
         Args:
             http_client: The async HTTP client to use for token requests.
@@ -379,10 +393,14 @@ class Authenticator:
         Returns:
             A valid access token.
         """
-        if self._access_token is None or self._access_token.is_expired:
-            self._access_token = await self._request_access_token_async(http_client)
+        token = self._access_token
+        if token is not None and not token.is_expired:
+            return token
 
-        return self._access_token
+        async with self._async_lock:
+            if self._access_token is None or self._access_token.is_expired:
+                self._access_token = await self._request_access_token_async(http_client)
+            return self._access_token
 
     def invalidate_token(self) -> None:
         """Invalidate the current access token.

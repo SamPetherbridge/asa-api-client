@@ -1,9 +1,13 @@
 """Tests for the AppleAdsClient."""
 
+import asyncio
 from typing import ClassVar
 
 import pytest
+from pytest_httpx import HTTPXMock
 
+from asa_api_client.auth import TOKEN_URL
+from asa_api_client.exceptions import ConfigurationError
 from asa_api_client.v1.client import DEFAULT_V1_BASE_URL, AppleAdsClient
 
 
@@ -153,3 +157,113 @@ class TestLifecycle:
         async with make_client(ec_private_key_pem) as client:
             client._get_async_http_client()
         assert client._async_http_client is None
+
+
+class TestRetryConfig:
+    """Tests for configurable client retry parameters."""
+
+    def test_custom_retry_options_stored_on_client(self, ec_private_key_pem: str) -> None:
+        """Test retry options pass through to the client and resource views."""
+        client = make_client(
+            ec_private_key_pem,
+            max_retries=2,
+            retry_initial_delay=1.5,
+            retry_max_delay=30.0,
+            retry_jitter=False,
+        )
+        assert client.max_retries == 2
+        assert client.retry_initial_delay == 1.5
+        assert client.retry_max_delay == 30.0
+        assert client.retry_jitter is False
+        assert client.campaigns._max_retries == 2
+
+    def test_negative_retry_raises_configuration_error(self, ec_private_key_pem: str) -> None:
+        """Test negative retry parameters raise ConfigurationError."""
+        with pytest.raises(ConfigurationError, match="max_retries"):
+            make_client(ec_private_key_pem, max_retries=-1)
+        with pytest.raises(ConfigurationError, match="retry_initial_delay"):
+            make_client(ec_private_key_pem, retry_initial_delay=-0.5)
+
+
+class TestMultiAccountScoping:
+    """Tests for with_account() and resolve_ad_account()."""
+
+    async def test_with_account_isolates_headers_and_shares_transport(
+        self, httpx_mock: HTTPXMock, ec_private_key_pem: str
+    ) -> None:
+        """Concurrent scoped views send distinct X-AP-Context headers and share auth/HTTP."""
+        httpx_mock.add_response(
+            url=TOKEN_URL,
+            json={"access_token": "shared-tok", "token_type": "Bearer", "expires_in": 3600},
+        )
+        httpx_mock.add_response(
+            url=f"{DEFAULT_V1_BASE_URL}/campaigns/query",
+            json={"result": []},
+            is_reusable=True,
+        )
+
+        async with make_client(ec_private_key_pem, ad_account_id="100") as root:
+            with root.with_account("200") as acct_a:
+                assert acct_a._authenticator is root._authenticator
+            # Exiting scoped context manager must not close parent's HTTP pools
+            root_async = root._get_async_http_client()
+            async with root.with_account("200") as acct_200, root.with_account("300") as acct_300:
+                await asyncio.gather(
+                    acct_200.campaigns.query_async(),
+                    acct_300.campaigns.query_async(),
+                )
+            assert not root_async.is_closed
+            assert root.ad_account_id == "100"
+
+        assert len(httpx_mock.get_requests(url=TOKEN_URL)) == 1
+        contexts = {
+            req.headers["X-AP-Context"]
+            for req in httpx_mock.get_requests(url=f"{DEFAULT_V1_BASE_URL}/campaigns/query")
+        }
+        assert contexts == {"adAccountId=200", "adAccountId=300"}
+
+    def test_resolve_ad_account_single_and_preferred(
+        self, httpx_mock: HTTPXMock, ec_private_key_pem: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """resolve_ad_account discovers sole account or prefers prefer_org_id / ASA_ORG_ID."""
+        monkeypatch.delenv("ASA_ORG_ID", raising=False)
+        httpx_mock.add_response(
+            url=TOKEN_URL,
+            json={"access_token": "tok", "token_type": "Bearer", "expires_in": 3600},
+            is_reusable=True,
+        )
+        httpx_mock.add_response(
+            url=f"{DEFAULT_V1_BASE_URL}/acls",
+            json={
+                "result": {
+                    "acls": [
+                        {"adAccount": {"id": 10, "name": "First"}, "roles": ["Admin"]},
+                        {"adAccount": {"id": 20, "name": "Second"}, "roles": ["Admin"]},
+                    ]
+                }
+            },
+        )
+        client = make_client(ec_private_key_pem)
+        resolved = client.resolve_ad_account(prefer_org_id=20)
+        assert resolved == "20"
+        assert client.ad_account_id == "20"
+        # Subsequent call is a no-op returning the already-set account ID
+        assert client.resolve_ad_account() == "20"
+
+    async def test_resolve_ad_account_async_sole_account(
+        self, httpx_mock: HTTPXMock, ec_private_key_pem: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """resolve_ad_account_async selects the sole accessible account."""
+        monkeypatch.delenv("ASA_ORG_ID", raising=False)
+        httpx_mock.add_response(
+            url=TOKEN_URL,
+            json={"access_token": "tok", "token_type": "Bearer", "expires_in": 3600},
+        )
+        httpx_mock.add_response(
+            url=f"{DEFAULT_V1_BASE_URL}/acls",
+            json={"result": {"acls": [{"adAccount": {"id": 777, "name": "Only"}, "roles": []}]}},
+        )
+        async with make_client(ec_private_key_pem) as client:
+            resolved = await client.resolve_ad_account_async()
+            assert resolved == "777"
+            assert client.ad_account_id == "777"

@@ -19,7 +19,6 @@ from asa_api_client.v1.models.creatives import (
     CreativeUpdate,
 )
 from asa_api_client.v1.resources.base import (
-    DEFAULT_MAX_RETRIES,
     RETRYABLE_STATUS_CODES,
     CreatableMixin,
     DeletableMixin,
@@ -124,24 +123,32 @@ class AssetResource(
                 block.
         """
         payload = file if isinstance(file, bytes) else file.read()
-        headers = self._upload_headers(self._get_headers())
-        for attempt in range(DEFAULT_MAX_RETRIES + 1):
+        max_retries = self._max_retries
+        attempt = 0
+        refreshed_after_401 = False
+        while True:
+            headers = self._upload_headers(self._get_headers())
             response = self._http_client.post(
                 self._build_url("upload"),
                 files={"file": (file_name, payload)},
                 data=self._upload_form(promoted_object_id, promoted_object_type),
                 headers=headers,
             )
-            if response.status_code in RETRYABLE_STATUS_CODES and attempt < DEFAULT_MAX_RETRIES:
+            if response.status_code == 401 and not refreshed_after_401:
+                self._client._authenticator.invalidate_token()
+                refreshed_after_401 = True
+                continue
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
                 delay = self._calculate_retry_delay(attempt, response)
                 logger.warning(
                     "Upload received %d (attempt %d/%d), retrying in %.1fs",
                     response.status_code,
                     attempt + 1,
-                    DEFAULT_MAX_RETRIES + 1,
+                    max_retries + 1,
                     delay,
                 )
                 time.sleep(delay)
+                attempt += 1
                 continue
             break
         return self._finish_upload(response)
@@ -176,24 +183,32 @@ class AssetResource(
                 block.
         """
         payload = file if isinstance(file, bytes) else file.read()
-        headers = self._upload_headers(await self._get_headers_async())
-        for attempt in range(DEFAULT_MAX_RETRIES + 1):
+        max_retries = self._max_retries
+        attempt = 0
+        refreshed_after_401 = False
+        while True:
+            headers = self._upload_headers(await self._get_headers_async())
             response = await self._async_http_client.post(
                 self._build_url("upload"),
                 files={"file": (file_name, payload)},
                 data=self._upload_form(promoted_object_id, promoted_object_type),
                 headers=headers,
             )
-            if response.status_code in RETRYABLE_STATUS_CODES and attempt < DEFAULT_MAX_RETRIES:
+            if response.status_code == 401 and not refreshed_after_401:
+                self._client._authenticator.invalidate_token()
+                refreshed_after_401 = True
+                continue
+            if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
                 delay = self._calculate_retry_delay(attempt, response)
                 logger.warning(
                     "Upload received %d (attempt %d/%d), retrying in %.1fs",
                     response.status_code,
                     attempt + 1,
-                    DEFAULT_MAX_RETRIES + 1,
+                    max_retries + 1,
                     delay,
                 )
                 await asyncio.sleep(delay)
+                attempt += 1
                 continue
             break
         return self._finish_upload(response)
