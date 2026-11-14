@@ -9,11 +9,14 @@ from pytest_httpx import HTTPXMock
 from asa_api_client.exceptions import PartialFailureError
 from asa_api_client.v1.client import AppleAdsClient
 from asa_api_client.v1.models.reports import (
+    AppsCampaignReportResponse,
     AppsGroupBy,
     AppsIncludeRows,
     AppsKeywordMatchType,
+    AppsKeywordReportResponse,
     AppsOptions,
     AppsReportingRequest,
+    BrandsCampaignReportResponse,
     BrandsCreativeType,
     BrandsGroupBy,
     BrandsIncludeRows,
@@ -637,3 +640,109 @@ class TestEnums:
         assert BrandsGroupBy.LOCATION_ID.value == "locationId"
         assert ReportTimeZone.ORTZ.value == "ORTZ"
         assert AppsIncludeRows.EMPTY_METRICS.value == "EMPTY_METRICS"
+
+
+class TestReportDataFrame:
+    """Tests for V1ReportResponse.to_records() and to_dataframe()."""
+
+    def test_total_metrics_flattens_money_and_metadata(self) -> None:
+        """Test totalMetrics and ReportingMoney unwrap into flat DataFrame columns."""
+        response = AppsCampaignReportResponse.model_validate(
+            {
+                "result": {
+                    "rows": [
+                        {
+                            "metadata": {
+                                "id": 101,
+                                "name": "US Search",
+                                "dailyBudget": {"value": {"amount": "100.00", "currency": "USD"}},
+                            },
+                            "totalMetrics": {
+                                "impressions": 500,
+                                "taps": 25,
+                                "localSpend": {"amount": "12.50", "currency": "USD"},
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+        df = response.to_dataframe()
+        assert len(df) == 1
+        assert df.loc[0, "id"] == 101
+        assert df.loc[0, "name"] == "US Search"
+        assert df.loc[0, "daily_budget"] == "100.00"
+        assert df.loc[0, "impressions"] == 500
+        assert df.loc[0, "taps"] == 25
+        assert df.loc[0, "local_spend"] == "12.50"
+        assert df.loc[0, "currency"] == "USD"
+
+    def test_granular_metrics_expands_rows_per_period(self) -> None:
+        """Test granularMetrics emit one DataFrame row per period with metadata."""
+        response = AppsKeywordReportResponse.model_validate(
+            {
+                "result": {
+                    "rows": [
+                        {
+                            "metadata": {
+                                "id": 202,
+                                "text": "budget app",
+                                "bid": {"amount": "1.50", "currency": "USD"},
+                            },
+                            "insights": {"bidRecommendation": {"suggestedBidAmount": 1.85}},
+                            "granularMetrics": [
+                                {
+                                    "date": "2026-08-01",
+                                    "impressions": 100,
+                                    "localSpend": {"amount": "3.00", "currency": "USD"},
+                                },
+                                {
+                                    "date": "2026-08-02",
+                                    "impressions": 150,
+                                    "localSpend": {"amount": "4.50", "currency": "USD"},
+                                },
+                            ],
+                        }
+                    ]
+                }
+            }
+        )
+        df = response.to_dataframe()
+        assert len(df) == 2
+        assert df["date"].tolist() == [date(2026, 8, 1), date(2026, 8, 2)]
+        assert df["impressions"].tolist() == [100, 150]
+        assert df["local_spend"].tolist() == ["3.00", "4.50"]
+        assert df["bid"].tolist() == ["1.50", "1.50"]
+        assert df["suggested_bid_amount"].tolist() == [1.85, 1.85]
+        assert df["currency"].tolist() == ["USD", "USD"]
+
+    def test_brands_metrics_unwrap_tap_attribution(self) -> None:
+        """Test Brands ActionMetrics and CostMetrics unwrap tap values."""
+        response = BrandsCampaignReportResponse.model_validate(
+            {
+                "result": {
+                    "rows": [
+                        {
+                            "metadata": {"id": 303, "name": "Maps Campaign"},
+                            "totalMetrics": {
+                                "impressions": 80,
+                                "actions": {"tap": 8},
+                                "costPerAction": {"tap": {"amount": "2.25", "currency": "EUR"}},
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+        df = response.to_dataframe()
+        assert len(df) == 1
+        assert df.loc[0, "actions"] == 8
+        assert df.loc[0, "cost_per_action"] == "2.25"
+        assert df.loc[0, "currency"] == "EUR"
+
+    def test_empty_report_returns_empty_dataframe(self) -> None:
+        """Test an empty rows container returns an empty DataFrame."""
+        response = AppsCampaignReportResponse.model_validate({"result": {"rows": []}})
+        df = response.to_dataframe()
+        assert df.empty
+        assert response.to_records() == []

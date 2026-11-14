@@ -10,8 +10,10 @@ from asa_api_client.v1.client import AppleAdsClient
 from asa_api_client.v1.models.base import Money
 from asa_api_client.v1.models.bulk import (
     BulkKeywordCreate,
+    BulkKeywordDelete,
     BulkKeywordUpdate,
     BulkNegativeKeywordCreate,
+    BulkNegativeKeywordDelete,
     BulkNegativeKeywordUpdate,
     BulkOperation,
     BulkRequestItem,
@@ -452,6 +454,111 @@ class TestBulkNegativeKeywordUpdate:
         results = await BulkOperationResource(v1_client).update_negative_keywords_async(
             [BulkNegativeKeywordUpdate(id=400, status=NegativeKeywordStatus.ENABLED)]
         )
+        assert results == []
+
+
+class TestBulkDelete:
+    """Tests for POST /v1/{keywords,negative-keywords}/bulk-delete."""
+
+    def test_delete_keywords_accepts_bare_ids_and_models(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test delete_keywords() accepts bare IDs, models, and explicit request items."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/keywords/bulk-delete",
+            json={
+                "result": [
+                    {"correlationId": 1, "operation": "DELETE", "success": True},
+                    {
+                        "correlationId": 99,
+                        "operation": "DELETE",
+                        "success": False,
+                        "error": {
+                            "code": "ENTITY_NOT_FOUND",
+                            "message": "The specified keyword ID does not exist.",
+                        },
+                    },
+                ],
+                "error": None,
+            },
+        )
+        results = BulkOperationResource(v1_client).delete_keywords(
+            [
+                300,
+                BulkRequestItem(correlation_id=99, data=BulkKeywordDelete(id=301)),
+            ],
+            allow_partial_success=True,
+        )
+        request = httpx_mock.get_requests()[-1]
+        assert request.method == "POST"
+        assert request.url == f"{BASE_URL}/keywords/bulk-delete"
+        assert json.loads(request.content) == {
+            "allowPartialSuccess": True,
+            "items": [
+                {"correlationId": 1, "data": {"id": 300}},
+                {"correlationId": 99, "data": {"id": 301}},
+            ],
+        }
+        assert len(results) == 2
+        assert results[0].operation is BulkOperation.DELETE
+        assert results[0].success is True
+        assert results[0].result is None
+        assert results[1].correlation_id == 99
+        assert results[1].success is False
+        assert results[1].error is not None
+        assert results[1].error.code == "ENTITY_NOT_FOUND"
+
+    async def test_delete_keywords_async(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test async keyword bulk-delete."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/keywords/bulk-delete",
+            json={
+                "result": [{"correlationId": 1, "operation": "DELETE", "success": True}],
+                "error": None,
+            },
+        )
+        results = await BulkOperationResource(v1_client).delete_keywords_async([300])
+        assert results[0].success is True
+
+    def test_delete_negative_keywords(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test delete_negative_keywords() serializes IDs and parses outcomes."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/negative-keywords/bulk-delete",
+            json={
+                "result": [{"correlationId": 1, "operation": "DELETE", "success": True}],
+                "error": None,
+            },
+        )
+        results = BulkOperationResource(v1_client).delete_negative_keywords(
+            [BulkNegativeKeywordDelete(id=400)]
+        )
+        request = httpx_mock.get_requests()[-1]
+        assert request.method == "POST"
+        assert request.url == f"{BASE_URL}/negative-keywords/bulk-delete"
+        assert json.loads(request.content) == {
+            "allowPartialSuccess": False,
+            "items": [{"correlationId": 1, "data": {"id": 400}}],
+        }
+        assert results[0].operation is BulkOperation.DELETE
+        assert results[0].success is True
+
+    async def test_delete_negative_keywords_async(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test async negative-keyword bulk-delete."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/negative-keywords/bulk-delete",
+            json={"result": [], "error": None},
+        )
+        results = await BulkOperationResource(v1_client).delete_negative_keywords_async([400])
         assert results == []
 
 

@@ -13,11 +13,14 @@ optional ``summary`` populated when ``GRAND_TOTAL`` is requested.
 
 import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field
 
 from asa_api_client.v1.models.base import Money, V1Error, V1Model, V1Pagination
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Shared reporting enums
@@ -1324,6 +1327,135 @@ class BrandsReportingSearchTerm(V1Model):
 
 
 # ---------------------------------------------------------------------------
+# Shared report response flattening (to_records / to_dataframe)
+# ---------------------------------------------------------------------------
+
+
+def _flatten_report_dict(raw: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    """Flatten monetary and single-attribution wrappers into scalar values."""
+    out: dict[str, Any] = {}
+    detected_currency: str | None = None
+    for key, value in raw.items():
+        if isinstance(value, dict):
+            if "amount" in value and set(value.keys()) <= {"amount", "currency"}:
+                out[key] = value["amount"]
+                if detected_currency is None and isinstance(value.get("currency"), str):
+                    detected_currency = value["currency"]
+                continue
+            inner = value.get("value")
+            if (
+                set(value.keys()) == {"value"}
+                and isinstance(inner, dict)
+                and "amount" in inner
+                and set(inner.keys()) <= {"amount", "currency"}
+            ):
+                out[key] = inner["amount"]
+                if detected_currency is None and isinstance(inner.get("currency"), str):
+                    detected_currency = inner["currency"]
+                continue
+            if set(value.keys()) == {"tap"}:
+                tap_val = value["tap"]
+                if (
+                    isinstance(tap_val, dict)
+                    and "amount" in tap_val
+                    and set(tap_val.keys()) <= {"amount", "currency"}
+                ):
+                    out[key] = tap_val["amount"]
+                    if detected_currency is None and isinstance(tap_val.get("currency"), str):
+                        detected_currency = tap_val["currency"]
+                else:
+                    out[key] = tap_val
+                continue
+        out[key] = value
+    return out, detected_currency
+
+
+class V1ReportResponse(V1Model):
+    """Shared base class for Platform API v1 report responses."""
+
+    def to_records(self) -> list[dict[str, Any]]:
+        """Flatten report rows into a list of dictionaries.
+
+        When a row carries ``granular_metrics``, one dictionary is emitted per
+        granular period (combining row ``metadata`` with each period's metrics).
+        Otherwise, one dictionary is emitted combining ``metadata`` and
+        ``total_metrics``. Monetary wrappers (``Money`` and ``ReportingMoney``)
+        are unwrapped to their ``amount`` strings, with ``currency`` recorded
+        when present.
+
+        Returns:
+            Flattened row dictionaries suitable for tabular processing.
+        """
+        result: Any = getattr(self, "result", None)
+        if result is None or not result.rows:
+            return []
+
+        records: list[dict[str, Any]] = []
+        for row in result.rows:
+            base_data: dict[str, Any] = {}
+            row_currency: str | None = None
+
+            if row.metadata is not None:
+                meta_raw = row.metadata.model_dump(by_alias=False, exclude_none=True)
+                meta_flat, meta_currency = _flatten_report_dict(meta_raw)
+                base_data.update(meta_flat)
+                row_currency = meta_currency
+
+            insights = getattr(row, "insights", None)
+            if (
+                insights is not None
+                and insights.bid_recommendation is not None
+                and insights.bid_recommendation.suggested_bid_amount is not None
+            ):
+                base_data["suggested_bid_amount"] = insights.bid_recommendation.suggested_bid_amount
+
+            if row.granular_metrics:
+                for period in row.granular_metrics:
+                    period_raw = period.model_dump(by_alias=False, exclude_none=True)
+                    period_flat, period_currency = _flatten_report_dict(period_raw)
+                    entry = {**base_data, **period_flat}
+                    currency = period_currency or row_currency
+                    if currency is not None and "currency" not in entry:
+                        entry["currency"] = currency
+                    records.append(entry)
+            else:
+                entry = dict(base_data)
+                metric_currency: str | None = None
+                if row.total_metrics is not None:
+                    total_raw = row.total_metrics.model_dump(by_alias=False, exclude_none=True)
+                    total_flat, metric_currency = _flatten_report_dict(total_raw)
+                    entry.update(total_flat)
+                currency = metric_currency or row_currency
+                if currency is not None and "currency" not in entry:
+                    entry["currency"] = currency
+                records.append(entry)
+
+        return records
+
+    def to_dataframe(self) -> "pd.DataFrame":
+        """Convert report rows into a pandas DataFrame.
+
+        Requires the optional ``pandas`` extra:
+        ``pip install "asa-api-client[pandas]"``.
+
+        Returns:
+            A pandas DataFrame with flattened metadata and metric columns.
+
+        Raises:
+            ImportError: If ``pandas`` is not installed.
+        """
+        try:
+            import pandas as pd
+        except ImportError:
+            raise ImportError(
+                "pandas is required for to_dataframe(). "
+                'Install with: pip install "asa-api-client[pandas]"'
+            ) from None
+
+        return pd.DataFrame(self.to_records())
+
+
+# ---------------------------------------------------------------------------
 # APPS report rows, summaries, containers, responses
 # ---------------------------------------------------------------------------
 
@@ -1367,7 +1499,7 @@ class AppsCampaignResultContainer(V1Model):
     summary: AppsCampaignReportSummary | None = None
 
 
-class AppsCampaignReportResponse(V1Model):
+class AppsCampaignReportResponse(V1ReportResponse):
     """Response envelope for APPS campaign-level reports.
 
     Attributes:
@@ -1419,7 +1551,7 @@ class AppsAdGroupResultContainer(V1Model):
     summary: AppsAdGroupReportSummary | None = None
 
 
-class AppsAdGroupReportResponse(V1Model):
+class AppsAdGroupReportResponse(V1ReportResponse):
     """Response envelope for APPS ad group reports.
 
     Attributes:
@@ -1470,7 +1602,7 @@ class AppsAdResultContainer(V1Model):
     summary: AppsAdReportSummary | None = None
 
 
-class AppsAdReportResponse(V1Model):
+class AppsAdReportResponse(V1ReportResponse):
     """Response envelope for APPS ad-level reports.
 
     Attributes:
@@ -1523,7 +1655,7 @@ class AppsKeywordResultContainer(V1Model):
     summary: AppsKeywordReportSummary | None = None
 
 
-class AppsKeywordReportResponse(V1Model):
+class AppsKeywordReportResponse(V1ReportResponse):
     """Response envelope for APPS keyword-level reports.
 
     Attributes:
@@ -1574,7 +1706,7 @@ class AppsSearchTermResultContainer(V1Model):
     summary: AppsSearchTermReportSummary | None = None
 
 
-class AppsSearchTermReportResponse(V1Model):
+class AppsSearchTermReportResponse(V1ReportResponse):
     """Response envelope for APPS search term reports.
 
     Attributes:
@@ -1632,7 +1764,7 @@ class BrandsCampaignResultContainer(V1Model):
     summary: BrandsCampaignReportSummary | None = None
 
 
-class BrandsCampaignReportResponse(V1Model):
+class BrandsCampaignReportResponse(V1ReportResponse):
     """Response envelope for BRANDS campaign-level reports.
 
     Attributes:
@@ -1685,7 +1817,7 @@ class BrandsAdGroupResultContainer(V1Model):
     summary: BrandsAdGroupReportSummary | None = None
 
 
-class BrandsAdGroupReportResponse(V1Model):
+class BrandsAdGroupReportResponse(V1ReportResponse):
     """Response envelope for BRANDS ad group reports.
 
     Attributes:
@@ -1736,7 +1868,7 @@ class BrandsAdResultContainer(V1Model):
     summary: BrandsAdReportSummary | None = None
 
 
-class BrandsAdReportResponse(V1Model):
+class BrandsAdReportResponse(V1ReportResponse):
     """Response envelope for BRANDS ad-level reports.
 
     Attributes:
@@ -1789,7 +1921,7 @@ class BrandsKeywordResultContainer(V1Model):
     summary: BrandsKeywordReportSummary | None = None
 
 
-class BrandsKeywordReportResponse(V1Model):
+class BrandsKeywordReportResponse(V1ReportResponse):
     """Response envelope for BRANDS keyword-level reports.
 
     Attributes:
@@ -1840,7 +1972,7 @@ class BrandsSearchTermResultContainer(V1Model):
     summary: BrandsSearchTermReportSummary | None = None
 
 
-class BrandsSearchTermReportResponse(V1Model):
+class BrandsSearchTermReportResponse(V1ReportResponse):
     """Response envelope for BRANDS search term reports.
 
     Attributes:

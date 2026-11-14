@@ -3,9 +3,7 @@
 Bulk endpoints live under other resources' paths (``POST
 /v1/keywords/bulk-create`` etc.) but are grouped here as one resource.
 A bulk request counts as a single call against rate limits regardless
-of item count. Bulk delete endpoints are documented as "coming soon"
-and are not implemented; deletion still requires the single-record
-endpoints.
+of item count.
 
 By default (``allow_partial_success=False``) any single item failure
 rejects the whole batch. With ``allow_partial_success=True`` valid
@@ -23,11 +21,14 @@ from typing import Any, TypeVar
 
 from asa_api_client.v1.models.base import V1Model
 from asa_api_client.v1.models.bulk import (
+    BulkItemResultDelete,
     BulkItemResultKeyword,
     BulkItemResultNegativeKeyword,
     BulkKeywordCreate,
+    BulkKeywordDelete,
     BulkKeywordUpdate,
     BulkNegativeKeywordCreate,
+    BulkNegativeKeywordDelete,
     BulkNegativeKeywordUpdate,
     BulkRequestItem,
 )
@@ -38,22 +39,26 @@ ResultT = TypeVar("ResultT", bound=V1Model)
 
 
 class BulkOperationResource(V1Resource[V1Model, V1Model, V1Model]):
-    """Batch create/update operations for keywords and negative keywords.
+    """Batch create/update/delete operations for keywords and negative keywords.
 
     Endpoints:
         - ``POST /v1/keywords/bulk-create`` — create keywords in bulk
           (items may span different ad groups).
         - ``POST /v1/keywords/bulk-update`` — update keyword
           ``bid``/``status`` in bulk.
+        - ``POST /v1/keywords/bulk-delete`` — soft-delete keywords in
+          bulk by ID.
         - ``POST /v1/negative-keywords/bulk-create`` — create negative
           keywords in bulk (campaign- and ad-group-level may mix).
         - ``POST /v1/negative-keywords/bulk-update`` — update negative
           keyword ``status`` in bulk.
+        - ``POST /v1/negative-keywords/bulk-delete`` — soft-delete
+          negative keywords in bulk by ID.
 
-    Items may be passed as bare ``Bulk*Create``/``Bulk*Update`` payloads
-    (a 1-based positional ``correlationId`` is assigned automatically)
-    or as explicit :class:`BulkRequestItem` wrappers carrying custom
-    correlation IDs.
+    Items may be passed as bare ``Bulk*`` payloads (or bare integer IDs
+    for bulk-delete; a 1-based positional ``correlationId`` is assigned
+    automatically) or as explicit :class:`BulkRequestItem` wrappers
+    carrying custom correlation IDs.
 
     Example:
         Pause two keywords in one call::
@@ -320,3 +325,133 @@ class BulkOperationResource(V1Resource[V1Model, V1Model, V1Model]):
         payload = self._bulk_payload(items, allow_partial_success)
         data = await self._request_async("POST", "negative-keywords/bulk-update", json=payload)
         return self._parse_results(data, BulkItemResultNegativeKeyword)
+
+    def _normalize_keyword_deletes(
+        self,
+        items: Sequence[int | BulkKeywordDelete | BulkRequestItem[BulkKeywordDelete]],
+    ) -> list[BulkKeywordDelete | BulkRequestItem[BulkKeywordDelete]]:
+        """Coerce bare integer keyword IDs into BulkKeywordDelete payloads."""
+        return [BulkKeywordDelete(id=item) if isinstance(item, int) else item for item in items]
+
+    def _normalize_negative_keyword_deletes(
+        self,
+        items: Sequence[
+            int | BulkNegativeKeywordDelete | BulkRequestItem[BulkNegativeKeywordDelete]
+        ],
+    ) -> list[BulkNegativeKeywordDelete | BulkRequestItem[BulkNegativeKeywordDelete]]:
+        """Coerce bare integer negative-keyword IDs into BulkNegativeKeywordDelete payloads."""
+        return [
+            BulkNegativeKeywordDelete(id=item) if isinstance(item, int) else item for item in items
+        ]
+
+    def delete_keywords(
+        self,
+        items: Sequence[int | BulkKeywordDelete | BulkRequestItem[BulkKeywordDelete]],
+        *,
+        allow_partial_success: bool = False,
+    ) -> list[BulkItemResultDelete]:
+        """Soft-delete multiple keywords in a single request.
+
+        Args:
+            items: Keyword IDs, ``BulkKeywordDelete`` payloads, or
+                explicit request items.
+            allow_partial_success: Process valid items and report
+                failures per item instead of rejecting the whole batch.
+
+        Returns:
+            Per-item delete outcomes, positionally parallel to ``items``.
+
+        Raises:
+            PartialFailureError: If the response carries a top-level
+                error block (bulk-level rejection).
+            ValidationError: If the request body is invalid (HTTP 400).
+        """
+        normalized = self._normalize_keyword_deletes(items)
+        payload = self._bulk_payload(normalized, allow_partial_success)
+        data = self._request("POST", "keywords/bulk-delete", json=payload)
+        return self._parse_results(data, BulkItemResultDelete)
+
+    async def delete_keywords_async(
+        self,
+        items: Sequence[int | BulkKeywordDelete | BulkRequestItem[BulkKeywordDelete]],
+        *,
+        allow_partial_success: bool = False,
+    ) -> list[BulkItemResultDelete]:
+        """Soft-delete multiple keywords in a single request asynchronously.
+
+        Args:
+            items: Keyword IDs, ``BulkKeywordDelete`` payloads, or
+                explicit request items.
+            allow_partial_success: Process valid items and report
+                failures per item instead of rejecting the whole batch.
+
+        Returns:
+            Per-item delete outcomes, positionally parallel to ``items``.
+
+        Raises:
+            PartialFailureError: If the response carries a top-level
+                error block (bulk-level rejection).
+            ValidationError: If the request body is invalid (HTTP 400).
+        """
+        normalized = self._normalize_keyword_deletes(items)
+        payload = self._bulk_payload(normalized, allow_partial_success)
+        data = await self._request_async("POST", "keywords/bulk-delete", json=payload)
+        return self._parse_results(data, BulkItemResultDelete)
+
+    def delete_negative_keywords(
+        self,
+        items: Sequence[
+            int | BulkNegativeKeywordDelete | BulkRequestItem[BulkNegativeKeywordDelete]
+        ],
+        *,
+        allow_partial_success: bool = False,
+    ) -> list[BulkItemResultDelete]:
+        """Soft-delete multiple negative keywords in a single request.
+
+        Args:
+            items: Negative keyword IDs, ``BulkNegativeKeywordDelete``
+                payloads, or explicit request items.
+            allow_partial_success: Process valid items and report
+                failures per item instead of rejecting the whole batch.
+
+        Returns:
+            Per-item delete outcomes, positionally parallel to ``items``.
+
+        Raises:
+            PartialFailureError: If the response carries a top-level
+                error block (bulk-level rejection).
+            ValidationError: If the request body is invalid (HTTP 400).
+        """
+        normalized = self._normalize_negative_keyword_deletes(items)
+        payload = self._bulk_payload(normalized, allow_partial_success)
+        data = self._request("POST", "negative-keywords/bulk-delete", json=payload)
+        return self._parse_results(data, BulkItemResultDelete)
+
+    async def delete_negative_keywords_async(
+        self,
+        items: Sequence[
+            int | BulkNegativeKeywordDelete | BulkRequestItem[BulkNegativeKeywordDelete]
+        ],
+        *,
+        allow_partial_success: bool = False,
+    ) -> list[BulkItemResultDelete]:
+        """Soft-delete multiple negative keywords asynchronously.
+
+        Args:
+            items: Negative keyword IDs, ``BulkNegativeKeywordDelete``
+                payloads, or explicit request items.
+            allow_partial_success: Process valid items and report
+                failures per item instead of rejecting the whole batch.
+
+        Returns:
+            Per-item delete outcomes, positionally parallel to ``items``.
+
+        Raises:
+            PartialFailureError: If the response carries a top-level
+                error block (bulk-level rejection).
+            ValidationError: If the request body is invalid (HTTP 400).
+        """
+        normalized = self._normalize_negative_keyword_deletes(items)
+        payload = self._bulk_payload(normalized, allow_partial_success)
+        data = await self._request_async("POST", "negative-keywords/bulk-delete", json=payload)
+        return self._parse_results(data, BulkItemResultDelete)
