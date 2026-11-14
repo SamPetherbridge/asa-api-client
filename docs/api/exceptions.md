@@ -2,57 +2,65 @@
 
 ## Exception Hierarchy
 
-```
+```text
 AppleSearchAdsError
 ├── AuthenticationError
+├── AuthorizationError
 ├── ConfigurationError
+├── NetworkError
 ├── NotFoundError
+├── PartialFailureError
 ├── RateLimitError
+├── ServerError
 └── ValidationError
 ```
 
+All exceptions are exported directly from `asa_api_client`.
+
 ## AppleSearchAdsError
 
-Base exception for all API errors.
+Base exception for all API and client errors.
 
 ```python
 from asa_api_client import AppleSearchAdsError
 
 try:
-    client.campaigns.list()
-except AppleSearchAdsError as e:
-    print(f"API error: {e}")
+    client.campaigns.query()
+except AppleSearchAdsError as exc:
+    print(f"API error ({exc.status_code}): {exc}")
 ```
 
-## AuthenticationError
+## AuthenticationError & AuthorizationError
 
-Raised when authentication fails.
+`AuthenticationError` is raised on 401 / OAuth failures; `AuthorizationError` is raised on 403 permission failures.
 
 ```python
-from asa_api_client import AuthenticationError
+from asa_api_client import AuthenticationError, AuthorizationError
 
 try:
-    client.campaigns.list()
+    client.campaigns.query()
 except AuthenticationError:
-    print("Invalid credentials or expired token")
+    print("Invalid credentials or expired key")
+except AuthorizationError:
+    print("Insufficient permissions for this ad account")
 ```
 
 ## ConfigurationError
 
-Raised when client configuration is invalid.
+Raised before any network request when required credentials or account settings are missing or malformed.
 
 ```python
-from asa_api_client import ConfigurationError
+from asa_api_client import AppleAdsClient, ConfigurationError
 
 try:
-    client = AppleSearchAdsClient(...)
-except ConfigurationError as e:
-    print(f"Configuration error: {e}")
+    client = AppleAdsClient.from_env()
+except ConfigurationError as exc:
+    print(f"Configuration error: {exc}")
 ```
 
 ## NotFoundError
 
-Raised when a resource is not found.
+Raised when a requested entity ID does not exist (HTTP 404).
 
 ```python
 from asa_api_client import NotFoundError
@@ -63,28 +71,24 @@ except NotFoundError:
     print("Campaign not found")
 ```
 
-## RateLimitError
+## PartialFailureError
 
-Raised when API rate limit is exceeded.
+Raised when the API returns HTTP 2xx with a non-empty `error` block (exposes `exc.details`).
 
 ```python
-from asa_api_client import RateLimitError
+from asa_api_client import PartialFailureError
 
 try:
-    client.campaigns.list()
-except RateLimitError as e:
-    print(f"Rate limited, retry after: {e.retry_after}")
+    client.bulk.create_keywords(items, allow_partial_success=False)
+except PartialFailureError as exc:
+    for detail in exc.details:
+        print(detail)
 ```
+
+## RateLimitError, ServerError & NetworkError
+
+`RateLimitError` (HTTP 429, exposes `exc.retry_after`), `ServerError` (HTTP 5xx), and `NetworkError` (timeouts / transport errors) are raised when retries are exhausted or on non-idempotent write endpoints.
 
 ## ValidationError
 
-Raised when request validation fails.
-
-```python
-from asa_api_client import ValidationError
-
-try:
-    client.campaigns.create(invalid_data)
-except ValidationError as e:
-    print(f"Validation error: {e}")
-```
+Raised on HTTP 400/422 validation errors (exposes `exc.field_errors`).

@@ -1,70 +1,90 @@
 # Keywords
 
-Keywords are accessed through a campaign and ad group context.
+Platform API v1 provides single-item CRUD on `client.keywords` and `client.negative_keywords`, plus high-throughput batch endpoints on `client.bulk`.
 
-## List Keywords
-
-```python
-keywords = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.list()
-```
-
-## Get a Keyword
+## Query & Get Keywords
 
 ```python
-keyword = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.get(keyword_id)
-```
+from asa_api_client.v1 import Query
 
-## Find Keywords
-
-```python
-from asa_api_client.models import Selector
-
-active = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.find(
-    Selector().where("status", "==", "ACTIVE")
+page = client.keywords.query(
+    Query().where("adGroupId", "EQUALS", str(ad_group_id)).where("status", "EQUALS", "ENABLED")
 )
+
+keyword = client.keywords.get(keyword_id)
 ```
 
-## Create Keywords
-
-Keywords are created in bulk:
+## Single-Item Create, Update, and Delete
 
 ```python
-from asa_api_client.models import KeywordCreate, KeywordMatchType, Money
+from asa_api_client.v1.models.base import Money
+from asa_api_client.v1.models.keywords import (
+    KeywordCreate,
+    KeywordMatchType,
+    KeywordStatus,
+    KeywordUpdate,
+)
 
-result = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.create_bulk([
+created = client.keywords.create(
     KeywordCreate(
-        text="my keyword",
+        ad_group_id=ad_group_id,
+        text="budget app",
         match_type=KeywordMatchType.EXACT,
-        bid_amount=Money(amount="1.50", currency="USD"),
-    ),
-    KeywordCreate(
-        text="another keyword",
-        match_type=KeywordMatchType.BROAD,
-        bid_amount=Money(amount="1.00", currency="USD"),
-    ),
-])
+        bid=Money(amount="1.50", currency="USD"),
+        status=KeywordStatus.ENABLED,
+    )
+)
+
+client.keywords.update(
+    keyword_id,
+    KeywordUpdate(bid=Money(amount="1.80", currency="USD")),
+)
+
+client.keywords.delete(keyword_id)
 ```
 
-## Update Keywords
+## Bulk Create, Update, and Delete
+
+Use `client.bulk` to create, update, or delete up to 5,000 keywords or negative keywords per request:
 
 ```python
-from asa_api_client.models import KeywordUpdate
+from asa_api_client.v1.models.bulk import BulkKeywordUpdate
 
-client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.update_bulk([
-    KeywordUpdate(
-        id=keyword_id,
-        bid_amount=Money(amount="2.00", currency="USD"),
-    )
-])
+created_items = client.bulk.create_keywords(
+    [
+        KeywordCreate(
+            ad_group_id=ad_group_id,
+            text="expense tracker",
+            match_type=KeywordMatchType.EXACT,
+            bid=Money(amount="1.60", currency="USD"),
+        ),
+        KeywordCreate(
+            ad_group_id=ad_group_id,
+            text="personal finance",
+            match_type=KeywordMatchType.BROAD,
+            bid=Money(amount="1.20", currency="USD"),
+        ),
+    ]
+)
+
+client.bulk.update_keywords(
+    [
+        BulkKeywordUpdate(
+            id=keyword_id,
+            bid=Money(amount="2.00", currency="USD"),
+            status=KeywordStatus.PAUSED,
+        )
+    ]
+)
+
+# Pass bare IDs, BulkKeywordDelete models, or BulkRequestItem wrappers
+client.bulk.delete_keywords([keyword_id])
 ```
 
-## Match Types
+Negative keywords support the same bulk operations via `create_negative_keywords`, `update_negative_keywords`, and `delete_negative_keywords`.
 
-- `EXACT` - Exact match only
-- `BROAD` - Broad match including variations
+## Match Types & Statuses
 
-## Keyword Status
-
-- `ACTIVE` - Keyword is active
-- `PAUSED` - Keyword is paused
-- `DELETED` - Keyword is deleted
+- **App Store match types**: `EXACT`, `BROAD`
+- **Apple Maps match types**: `PHRASE`, `CATEGORY` (targeting keywords only)
+- **Statuses**: `ENABLED`, `PAUSED` (`DELETED` appears on `display_status` after soft-deletion)

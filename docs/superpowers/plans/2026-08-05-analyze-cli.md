@@ -99,7 +99,9 @@ def test_main_importable() -> None:
     assert callable(main)
 
 
-def test_missing_cli_extra_message(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_missing_cli_extra_message(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Missing optional deps produce the install hint, not a traceback."""
     import builtins
 
@@ -253,9 +255,7 @@ class TestResolveRange:
 
     def test_explicit_overrides_period(self) -> None:
         """--from/--to win over --period."""
-        start, end = resolve_range(
-            "30d", date(2026, 1, 1), date(2026, 3, 31), today=TODAY
-        )
+        start, end = resolve_range("30d", date(2026, 1, 1), date(2026, 3, 31), today=TODAY)
         assert (start, end) == (date(2026, 1, 1), date(2026, 3, 31))
 
     def test_from_without_to_defaults_to_yesterday(self) -> None:
@@ -384,9 +384,7 @@ def resolve_range(
     if end > yesterday:
         raise ValueError(f"--to ({end}) must not be in the future; latest full day is {yesterday}")
     if start < today - timedelta(days=MAX_LOOKBACK_DAYS):
-        raise ValueError(
-            f"--from ({start}) is beyond the API lookback of {MAX_LOOKBACK_DAYS} days"
-        )
+        raise ValueError(f"--from ({start}) is beyond the API lookback of {MAX_LOOKBACK_DAYS} days")
 
     return start, end
 
@@ -495,15 +493,36 @@ def _daily() -> pd.DataFrame:
     return normalize(
         pd.DataFrame(
             [
-                {"date": "2026-07-01", "campaign_id": 1, "campaign_name": "One",
-                 "app_name": "App A", "impressions": 1000, "taps": 100,
-                 "total_installs": 10, "local_spend": "50.0"},
-                {"date": "2026-07-02", "campaign_id": 1, "campaign_name": "One",
-                 "app_name": "App A", "impressions": 1000, "taps": 100,
-                 "total_installs": 10, "local_spend": "50.0"},
-                {"date": "2026-07-01", "campaign_id": 2, "campaign_name": "Two",
-                 "app_name": "App B", "impressions": 500, "taps": 0,
-                 "total_installs": 0, "local_spend": "25.0"},
+                {
+                    "date": "2026-07-01",
+                    "campaign_id": 1,
+                    "campaign_name": "One",
+                    "app_name": "App A",
+                    "impressions": 1000,
+                    "taps": 100,
+                    "total_installs": 10,
+                    "local_spend": "50.0",
+                },
+                {
+                    "date": "2026-07-02",
+                    "campaign_id": 1,
+                    "campaign_name": "One",
+                    "app_name": "App A",
+                    "impressions": 1000,
+                    "taps": 100,
+                    "total_installs": 10,
+                    "local_spend": "50.0",
+                },
+                {
+                    "date": "2026-07-01",
+                    "campaign_id": 2,
+                    "campaign_name": "Two",
+                    "app_name": "App B",
+                    "impressions": 500,
+                    "taps": 0,
+                    "total_installs": 0,
+                    "local_spend": "25.0",
+                },
             ]
         )
     )
@@ -611,12 +630,26 @@ class TestSummaryTables:
             normalize(
                 pd.DataFrame(
                     [
-                        {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 11,
-                         "keyword": "good", "impressions": 100, "taps": 10,
-                         "total_installs": 5, "local_spend": "10"},
-                        {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 12,
-                         "keyword": "bad", "impressions": 100, "taps": 10,
-                         "total_installs": 0, "local_spend": "30"},
+                        {
+                            "campaign_id": 1,
+                            "ad_group_id": 1,
+                            "keyword_id": 11,
+                            "keyword": "good",
+                            "impressions": 100,
+                            "taps": 10,
+                            "total_installs": 5,
+                            "local_spend": "10",
+                        },
+                        {
+                            "campaign_id": 1,
+                            "ad_group_id": 1,
+                            "keyword_id": 12,
+                            "keyword": "bad",
+                            "impressions": 100,
+                            "taps": 10,
+                            "total_installs": 0,
+                            "local_spend": "30",
+                        },
                     ]
                 )
             ),
@@ -904,6 +937,7 @@ def token_json() -> dict[str, Any]:
 
 def campaigns_json() -> dict[str, Any]:
     """Two campaigns for two apps."""
+
     def campaign(cid: int, name: str, adam: int) -> dict[str, Any]:
         return {
             "id": cid,
@@ -1118,7 +1152,11 @@ class TestFetchAll:
         async with _client() as client:
             meta, _ = resolve_scope(client, None)
             await fetch_all(
-                client, meta, START, END, today=TODAY,
+                client,
+                meta,
+                START,
+                END,
+                today=TODAY,
                 on_progress=lambda key, done, total: seen.__setitem__(key, (done, total)),
             )
         assert seen["campaigns"] == (2, 2)  # current + prior window
@@ -1135,8 +1173,10 @@ class TestFetchAll:
         """
         _mock_common(httpx_mock)
         httpx_mock.add_response(
-            url=f"{API}/reports/campaigns/2/keywords", status_code=400,
-            json={"error": {"errors": [{"message": "boom"}]}}, is_reusable=True,
+            url=f"{API}/reports/campaigns/2/keywords",
+            status_code=400,
+            json={"error": {"errors": [{"message": "boom"}]}},
+            is_reusable=True,
         )
         self._mock_reports(httpx_mock)
         async with _client() as client:
@@ -1146,9 +1186,7 @@ class TestFetchAll:
         assert result.levels["keywords"].notes
         assert not result.levels["keywords"].daily.empty  # campaign 1 still there
 
-    async def test_whole_level_failure_raises(
-        self, asa_env: None, httpx_mock: HTTPXMock
-    ) -> None:
+    async def test_whole_level_failure_raises(self, asa_env: None, httpx_mock: HTTPXMock) -> None:
         """Every chunk of a level failing aborts the run with context.
 
         Failure mocks registered first — see the note on the previous test.
@@ -1156,8 +1194,10 @@ class TestFetchAll:
         _mock_common(httpx_mock)
         for cid in (1, 2):
             httpx_mock.add_response(
-                url=f"{API}/reports/campaigns/{cid}/ads", status_code=400,
-                json={"error": {"errors": [{"message": "no ads"}]}}, is_reusable=True,
+                url=f"{API}/reports/campaigns/{cid}/ads",
+                status_code=400,
+                json={"error": {"errors": [{"message": "no ads"}]}},
+                is_reusable=True,
             )
         self._mock_reports(httpx_mock)
         async with _client() as client:
@@ -1173,9 +1213,7 @@ class TestFetchAll:
         self._mock_reports(httpx_mock)
         async with _client() as client:
             meta, _ = resolve_scope(client, None)
-            result = await fetch_all(
-                client, meta, date(2025, 8, 6), date(2026, 8, 4), today=TODAY
-            )
+            result = await fetch_all(client, meta, date(2025, 8, 6), date(2026, 8, 4), today=TODAY)
         assert any("90" in n for n in result.levels["search_terms"].notes)
 ```
 
@@ -1404,9 +1442,7 @@ async def fetch_all(
     per_campaign: dict[str, Callable[[int, date, date], Awaitable[ReportingResponse]]] = {
         "ad_groups": lambda cid, s, e: reports.ad_groups_async(cid, s, e, timezone=timezone),
         "keywords": lambda cid, s, e: reports.keywords_async(cid, s, e, timezone=timezone),
-        "search_terms": lambda cid, s, e: reports.search_terms_async(
-            cid, s, e, timezone=timezone
-        ),
+        "search_terms": lambda cid, s, e: reports.search_terms_async(cid, s, e, timezone=timezone),
         "ads": lambda cid, s, e: reports.ads_async(cid, s, e, timezone=timezone),
     }
     level_windows = {key: st_windows if key == "search_terms" else windows for key in per_campaign}
@@ -1460,9 +1496,7 @@ async def fetch_all(
     tasks += [_campaign_window(win, prior=False) for win in windows]
     tasks += [_campaign_window(win, prior=True) for win in prior_windows]
     for level in per_campaign:
-        tasks += [
-            _chunk(level, cid, win) for cid in campaign_ids for win in level_windows[level]
-        ]
+        tasks += [_chunk(level, cid, win) for cid in campaign_ids for win in level_windows[level]]
     # return_exceptions=True lets every in-flight request finish before we
     # re-raise, so an aborting run doesn't leave tasks using a closing client.
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -1480,9 +1514,7 @@ async def fetch_all(
     levels: dict[str, LevelData] = {}
     for key, label in LEVELS:
         if key != "campaigns" and failures[key] and not frames[key]:
-            raise LevelFetchError(
-                f"{label}: every request failed; first error: {notes[key][0]}"
-            )
+            raise LevelFetchError(f"{label}: every request failed; first error: {notes[key][0]}")
         daily = pd.concat(frames[key], ignore_index=True) if frames[key] else pd.DataFrame()
         levels[key] = LevelData(label=label, daily=_merge_names(daily, meta), notes=notes[key])
 
@@ -1545,14 +1577,28 @@ def _campaign_daily() -> pd.DataFrame:
     return normalize(
         pd.DataFrame(
             [
-                {"date": "2026-07-01", "campaign_id": 1, "campaign_name": "One",
-                 "campaign_status": "ENABLED", "app_name": "App A",
-                 "impressions": 1000, "taps": 100, "total_installs": 10,
-                 "local_spend": "50.0"},
-                {"date": "2026-07-02", "campaign_id": 2, "campaign_name": "Two",
-                 "campaign_status": "ENABLED", "app_name": "App B",
-                 "impressions": 500, "taps": 5, "total_installs": 0,
-                 "local_spend": "25.0"},
+                {
+                    "date": "2026-07-01",
+                    "campaign_id": 1,
+                    "campaign_name": "One",
+                    "campaign_status": "ENABLED",
+                    "app_name": "App A",
+                    "impressions": 1000,
+                    "taps": 100,
+                    "total_installs": 10,
+                    "local_spend": "50.0",
+                },
+                {
+                    "date": "2026-07-02",
+                    "campaign_id": 2,
+                    "campaign_name": "Two",
+                    "campaign_status": "ENABLED",
+                    "app_name": "App B",
+                    "impressions": 500,
+                    "taps": 5,
+                    "total_installs": 0,
+                    "local_spend": "25.0",
+                },
             ]
         )
     )
@@ -1563,14 +1609,30 @@ def _keyword_agg() -> pd.DataFrame:
         normalize(
             pd.DataFrame(
                 [
-                    {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 11,
-                     "keyword": "good", "campaign_name": "One", "ad_group_name": "AG",
-                     "impressions": 100, "taps": 10, "total_installs": 5,
-                     "local_spend": "10"},
-                    {"campaign_id": 1, "ad_group_id": 1, "keyword_id": 12,
-                     "keyword": "bad", "campaign_name": "One", "ad_group_name": "AG",
-                     "impressions": 100, "taps": 10, "total_installs": 0,
-                     "local_spend": "30"},
+                    {
+                        "campaign_id": 1,
+                        "ad_group_id": 1,
+                        "keyword_id": 11,
+                        "keyword": "good",
+                        "campaign_name": "One",
+                        "ad_group_name": "AG",
+                        "impressions": 100,
+                        "taps": 10,
+                        "total_installs": 5,
+                        "local_spend": "10",
+                    },
+                    {
+                        "campaign_id": 1,
+                        "ad_group_id": 1,
+                        "keyword_id": 12,
+                        "keyword": "bad",
+                        "campaign_name": "One",
+                        "ad_group_name": "AG",
+                        "impressions": 100,
+                        "taps": 10,
+                        "total_installs": 0,
+                        "local_spend": "30",
+                    },
                 ]
             )
         ),
@@ -1588,16 +1650,37 @@ def _write(tmp_path: Path) -> Path:
         period_label="2026-07-01 – 2026-07-02 (2 days)",
         timezone="UTC",
         generated_at=datetime(2026, 8, 5, 9, 30),
-        kpis={"spend": 75.0, "impressions": 1500.0, "taps": 105.0, "installs": 10.0,
-              "ttr": 0.07, "cvr": 0.095, "cpt": 0.714, "cpa": 7.5},
-        prior_kpis={"spend": 50.0, "impressions": 1000.0, "taps": 100.0, "installs": 20.0,
-                    "ttr": 0.1, "cvr": 0.2, "cpt": 0.5, "cpa": 2.5},
+        kpis={
+            "spend": 75.0,
+            "impressions": 1500.0,
+            "taps": 105.0,
+            "installs": 10.0,
+            "ttr": 0.07,
+            "cvr": 0.095,
+            "cpt": 0.714,
+            "cpa": 7.5,
+        },
+        prior_kpis={
+            "spend": 50.0,
+            "impressions": 1000.0,
+            "taps": 100.0,
+            "installs": 20.0,
+            "ttr": 0.1,
+            "cvr": 0.2,
+            "cpt": 0.5,
+            "cpa": 2.5,
+        },
         daily=pd.DataFrame(
             {"date": ["2026-07-01", "2026-07-02"], "spend": [50.0, 25.0], "installs": [10, 0]}
         ),
         per_app=pd.DataFrame(
-            {"app_name": ["App A", "App B"], "spend": [50.0, 25.0],
-             "impressions": [1000, 500], "taps": [100, 5], "installs": [10, 0]}
+            {
+                "app_name": ["App A", "App B"],
+                "spend": [50.0, 25.0],
+                "impressions": [1000, 500],
+                "taps": [100, 5],
+                "installs": [10, 0],
+            }
         ),
         top_keywords=kw.head(5),
         wasted=kw[(kw["spend"] > 0) & (kw["installs"] == 0)],
@@ -1606,12 +1689,27 @@ def _write(tmp_path: Path) -> Path:
     write_workbook(
         path,
         summary=summary,
-        analysis={"campaigns": camp_agg, "ad_groups": empty, "keywords": kw,
-                  "search_terms": empty, "ads": empty},
-        daily={"campaigns": daily, "ad_groups": empty, "keywords": empty,
-               "search_terms": empty, "ads": empty},
-        notes={"campaigns": [], "ad_groups": [], "keywords": [],
-               "search_terms": ["Search terms limited to trailing 90 days."], "ads": []},
+        analysis={
+            "campaigns": camp_agg,
+            "ad_groups": empty,
+            "keywords": kw,
+            "search_terms": empty,
+            "ads": empty,
+        },
+        daily={
+            "campaigns": daily,
+            "ad_groups": empty,
+            "keywords": empty,
+            "search_terms": empty,
+            "ads": empty,
+        },
+        notes={
+            "campaigns": [],
+            "ad_groups": [],
+            "keywords": [],
+            "search_terms": ["Search terms limited to trailing 90 days."],
+            "ads": [],
+        },
     )
     return path
 
@@ -1622,9 +1720,19 @@ class TestWorkbook:
     def test_sheet_order(self, tmp_path: Path) -> None:
         """Summary, five analysis sheets, then grey daily sheets."""
         wb = load_workbook(_write(tmp_path))
-        expected = ["Summary", "Campaigns", "Ad Groups", "Keywords", "Search Terms",
-                    "Ads", "Daily · Campaigns", "Daily · Ad Groups", "Daily · Keywords",
-                    "Daily · Search Terms", "Daily · Ads"]
+        expected = [
+            "Summary",
+            "Campaigns",
+            "Ad Groups",
+            "Keywords",
+            "Search Terms",
+            "Ads",
+            "Daily · Campaigns",
+            "Daily · Ad Groups",
+            "Daily · Keywords",
+            "Daily · Search Terms",
+            "Daily · Ads",
+        ]
         visible = [n for n in wb.sheetnames if n != "Chart Data"]
         assert visible == expected
 
@@ -1913,7 +2021,10 @@ def _write_analysis_sheet(
     )
     red_fill = book.add_format({"bg_color": "#FEE2E2"})
     ws.conditional_format(
-        1, 0, last_row, n_cols - 1,
+        1,
+        0,
+        last_row,
+        n_cols - 1,
         {
             "type": "formula",
             "criteria": f"=AND(${spend_c}2>0,${installs_c}2=0)",
@@ -1924,7 +2035,10 @@ def _write_analysis_sheet(
         amber = book.add_format({"bg_color": "#FEF3C7"})
         green = book.add_format({"bg_color": "#DCFCE7"})
         ws.conditional_format(
-            1, cpa_idx, last_row, cpa_idx,
+            1,
+            cpa_idx,
+            last_row,
+            cpa_idx,
             {
                 "type": "formula",
                 "criteria": f"=AND(ISNUMBER(${cpa_c}2),${cpa_c}2>{cpa_benchmark * 1.5})",
@@ -1932,12 +2046,14 @@ def _write_analysis_sheet(
             },
         )
         ws.conditional_format(
-            1, cpa_idx, last_row, cpa_idx,
+            1,
+            cpa_idx,
+            last_row,
+            cpa_idx,
             {
                 "type": "formula",
                 "criteria": (
-                    f"=AND(ISNUMBER(${cpa_c}2),${cpa_c}2<{cpa_benchmark * 0.75},"
-                    f"${installs_c}2>=5)"
+                    f"=AND(ISNUMBER(${cpa_c}2),${cpa_c}2<{cpa_benchmark * 0.75},${installs_c}2>=5)"
                 ),
                 "format": green,
             },
@@ -1969,9 +2085,7 @@ def _delta_cell(key: str, delta: float | None) -> tuple[str, str]:
     return f"{arrow} {abs(delta):.1%} vs prior", fmt
 
 
-def _write_summary(
-    book: Any, summary: SummaryData, fmts: dict[str, Format]
-) -> None:
+def _write_summary(book: Any, summary: SummaryData, fmts: dict[str, Format]) -> None:
     """Write the Summary sheet: title, KPI band, chart, callouts."""
     ws = book.add_worksheet("Summary")
     ws.set_column(0, 8, 16)
@@ -1985,9 +2099,7 @@ def _write_summary(
     )
 
     kpi_fmt = {"currency": "kpi_currency", "int": "kpi_int", "percent": "kpi_percent"}
-    kpi_deltas = (
-        _deltas(summary.kpis, summary.prior_kpis) if summary.prior_kpis else {}
-    )
+    kpi_deltas = _deltas(summary.kpis, summary.prior_kpis) if summary.prior_kpis else {}
     for idx, (label, key, kind) in enumerate(KPI_SPEC):
         ws.write_string(3, idx, label, fmts["kpi_label"])
         _write_value(ws, 4, idx, summary.kpis.get(key), fmts[kpi_fmt[kind]], fmts["dash"])
@@ -2027,8 +2139,13 @@ def _write_summary(
     row = 23
     ws.write_string(row, 0, "Top 5 keywords by installs", fmts["callout_header"])
     top_last = _write_table(
-        ws, summary.top_keywords, _CALLOUT_SPEC, fmts,
-        start_row=row + 1, autofilter=False, freeze=False,
+        ws,
+        summary.top_keywords,
+        _CALLOUT_SPEC,
+        fmts,
+        start_row=row + 1,
+        autofilter=False,
+        freeze=False,
     )
     ws.write_string(row, 5, "Wasted spend", fmts["callout_header"])
     wasted_spec = [(c, h, k) for c, h, k in _CALLOUT_SPEC if c != "cpa"]
@@ -2044,8 +2161,13 @@ def _write_summary(
         app_row = max(top_last, wasted_last) + 4
         ws.write_string(app_row, 0, "Per-app breakdown", fmts["callout_header"])
         _write_table(
-            ws, summary.per_app, _PER_APP_SPEC, fmts,
-            start_row=app_row + 1, autofilter=False, freeze=False,
+            ws,
+            summary.per_app,
+            _PER_APP_SPEC,
+            fmts,
+            start_row=app_row + 1,
+            autofilter=False,
+            freeze=False,
         )
 
 
@@ -2102,8 +2224,12 @@ def write_workbook(
         cpa_benchmark = summary.kpis.get("cpa")
         for key, label in LEVELS:
             _write_analysis_sheet(
-                book, label, analysis.get(key, pd.DataFrame()),
-                ANALYSIS_COLUMNS[key], fmts, cpa_benchmark,
+                book,
+                label,
+                analysis.get(key, pd.DataFrame()),
+                ANALYSIS_COLUMNS[key],
+                fmts,
+                cpa_benchmark,
             )
         for key, label in LEVELS:
             ws = book.add_worksheet(f"Daily · {label}")
@@ -2208,9 +2334,7 @@ def _mock_api(httpx_mock: HTTPXMock) -> None:
 class TestAnalyzeCommand:
     """asa analyze end to end."""
 
-    def test_happy_path(
-        self, asa_env: None, httpx_mock: HTTPXMock, tmp_path: Path
-    ) -> None:
+    def test_happy_path(self, asa_env: None, httpx_mock: HTTPXMock, tmp_path: Path) -> None:
         """Writes the workbook, prints its path and a headline."""
         _mock_api(httpx_mock)
         out = tmp_path / "report.xlsx"
@@ -2233,9 +2357,7 @@ class TestAnalyzeCommand:
         produced = list(tmp_path.glob("asa-analysis-111-*.xlsx"))
         assert len(produced) == 1
 
-    def test_invalid_range_fails_before_network(
-        self, asa_env: None, httpx_mock: HTTPXMock
-    ) -> None:
+    def test_invalid_range_fails_before_network(self, asa_env: None, httpx_mock: HTTPXMock) -> None:
         """--from after --to exits non-zero with a clean message and no requests."""
         result = runner.invoke(app, ["analyze", "--from", "2026-05-02", "--to", "2026-05-01"])
         assert result.exit_code != 0
@@ -2247,8 +2369,14 @@ class TestAnalyzeCommand:
     ) -> None:
         """No env vars → one-line configuration error, no traceback."""
         monkeypatch.chdir(tmp_path)  # hermetic: don't pick up a stray repo .env
-        for var in ("ASA_CLIENT_ID", "ASA_TEAM_ID", "ASA_KEY_ID", "ASA_ORG_ID",
-                    "ASA_PRIVATE_KEY", "ASA_PRIVATE_KEY_PATH"):
+        for var in (
+            "ASA_CLIENT_ID",
+            "ASA_TEAM_ID",
+            "ASA_KEY_ID",
+            "ASA_ORG_ID",
+            "ASA_PRIVATE_KEY",
+            "ASA_PRIVATE_KEY_PATH",
+        ):
             monkeypatch.delenv(var, raising=False)
         result = runner.invoke(app, ["analyze"])
         assert result.exit_code == 1
@@ -2302,8 +2430,13 @@ class Period(StrEnum):
 
 
 _CURRENCY_FORMATS = {
-    "USD": "$#,##0.00", "AUD": "$#,##0.00", "CAD": "$#,##0.00", "NZD": "$#,##0.00",
-    "EUR": "€#,##0.00", "GBP": "£#,##0.00", "JPY": "¥#,##0",
+    "USD": "$#,##0.00",
+    "AUD": "$#,##0.00",
+    "CAD": "$#,##0.00",
+    "NZD": "$#,##0.00",
+    "EUR": "€#,##0.00",
+    "GBP": "£#,##0.00",
+    "JPY": "¥#,##0",
 }
 
 
@@ -2317,7 +2450,7 @@ def _currency_format(code: str | None) -> str:
 def _currency_symbol(currency_format: str) -> str:
     """First non-format character of the currency format, for the headline."""
     head = currency_format[0]
-    return head if head not in "#0[\"" else "$"
+    return head if head not in '#0["' else "$"
 
 
 def _fail(message: str) -> "typer.Exit":
@@ -2344,8 +2477,13 @@ async def _fetch(
 
     try:
         return await fetch.fetch_all(
-            client, meta, start, end, timezone=timezone,
-            today=datetime.now(tz=UTC).date(), on_progress=on_progress,
+            client,
+            meta,
+            start,
+            end,
+            timezone=timezone,
+            today=datetime.now(tz=UTC).date(),
+            on_progress=on_progress,
         )
     finally:
         await client.aclose()
@@ -2371,9 +2509,7 @@ def analyze(
     output: Annotated[
         Path | None, typer.Option("--output", "-o", help="Output .xlsx path.")
     ] = None,
-    timezone: Annotated[
-        str, typer.Option("--timezone", help="Reporting timezone.")
-    ] = "UTC",
+    timezone: Annotated[str, typer.Option("--timezone", help="Reporting timezone.")] = "UTC",
     currency_format: Annotated[
         str | None,
         typer.Option("--currency-format", help="Excel number format for money."),
@@ -2418,8 +2554,7 @@ def analyze(
 
     daily_frames = {key: metrics.normalize(lv.daily) for key, lv in result.levels.items()}
     analysis = {
-        key: metrics.aggregate(daily_frames[key], metrics.LEVEL_KEYS[key])
-        for key in daily_frames
+        key: metrics.aggregate(daily_frames[key], metrics.LEVEL_KEYS[key]) for key in daily_frames
     }
     campaign_daily = daily_frames["campaigns"]
     current_kpis = metrics.kpis(campaign_daily)
@@ -2455,8 +2590,12 @@ def analyze(
     out_path = output or Path(f"asa-analysis-{file_scope}-{today:%Y-%m-%d}.xlsx")
     notes = {key: lv.notes for key, lv in result.levels.items()}
     write_workbook(
-        out_path, summary=summary, analysis=analysis, daily=daily_frames,
-        notes=notes, currency_format=fmt,
+        out_path,
+        summary=summary,
+        analysis=analysis,
+        daily=daily_frames,
+        notes=notes,
+        currency_format=fmt,
     )
 
     symbol = _currency_symbol(fmt)
@@ -2466,8 +2605,7 @@ def analyze(
     cpa_text = f"{symbol}{cpa:,.2f} CPA" if cpa == cpa else "— CPA"
     typer.echo(str(out_path))
     typer.echo(
-        f"{symbol}{spend:,.0f} spend · {installs} installs · {cpa_text} "
-        f"over {day_count} days"
+        f"{symbol}{spend:,.0f} spend · {installs} installs · {cpa_text} over {day_count} days"
     )
 ```
 

@@ -1,9 +1,23 @@
 # Campaigns
 
-## List Campaigns
+Platform API v1 campaigns (`client.campaigns`) represent top-level App Store (`APPSTORE_APP`) and Apple Maps (`BUSINESS_BRAND`) advertising containers.
+
+## Query & Iterate Campaigns
 
 ```python
-campaigns = client.campaigns.list()
+from asa_api_client.v1 import Query
+
+# Single page with typed filters
+enabled = client.campaigns.query(
+    Query()
+    .where("status", "EQUALS", "ENABLED")
+    .order_by("id", "DESC")
+    .page(size=100, fetch_total_count=True)
+)
+
+# Automatic pagination across all pages
+for campaign in client.campaigns.iter_all():
+    print(f"{campaign.id}: {campaign.name} ({campaign.display_status})")
 ```
 
 ## Get a Campaign
@@ -12,68 +26,54 @@ campaigns = client.campaigns.list()
 campaign = client.campaigns.get(campaign_id)
 ```
 
-## Find Campaigns
-
-Use selectors for filtering:
-
-```python
-from asa_api_client.models import Selector
-
-# By status
-enabled = client.campaigns.find(
-    Selector().where("status", "==", "ENABLED")
-)
-
-# By country
-us_campaigns = client.campaigns.find(
-    Selector().where("countriesOrRegions", "CONTAINS_ANY", ["US"])
-)
-```
-
 ## Create a Campaign
 
 ```python
-from asa_api_client.models import (
+from asa_api_client.v1.models.base import Money
+from asa_api_client.v1.models.campaigns import (
+    BillingEvent,
     CampaignCreate,
-    Money,
-    CampaignSupplySource,
+    CampaignTargeting,
+    DailyBudget,
+    PromotedObjectType,
 )
+from asa_api_client.v1.models.shared import TargetingData
 
 campaign = client.campaigns.create(
     CampaignCreate(
-        name="My Campaign",
-        adam_id=123456789,  # Your app's Adam ID
-        countries_or_regions=["US"],
-        daily_budget_amount=Money(amount="100", currency="USD"),
-        supply_sources=[CampaignSupplySource.APPSTORE_SEARCH_RESULTS],
+        ad_account_id=123456,
+        name="US Search",
+        billing_event=BillingEvent.TAPS,
+        promoted_object_type=PromotedObjectType.APPSTORE_APP,
+        promoted_object_id="987654321",
+        daily_budget=DailyBudget(value=Money(amount="100.00", currency="USD")),
+        targeting=CampaignTargeting(
+            supply_source=TargetingData(include=["APPSTORE"]),
+            supply_placement=TargetingData(include=["APPSTORE_SEARCH_RESULTS"]),
+            country_or_region=TargetingData(include=["US"]),
+        ),
     )
 )
 ```
 
-## Update a Campaign
+## Update or Delete a Campaign
 
 ```python
-from asa_api_client.models import CampaignUpdate
+from asa_api_client.v1.models.campaigns import CampaignStatus, CampaignUpdate
 
 client.campaigns.update(
     campaign_id,
     CampaignUpdate(
-        daily_budget_amount=Money(amount="150", currency="USD")
-    )
+        status=CampaignStatus.PAUSED,
+        daily_budget=DailyBudget(value=Money(amount="150.00", currency="USD")),
+    ),
 )
+
+client.campaigns.delete(campaign_id)
 ```
 
-## Campaign States
+## Campaign Statuses
 
-- `ENABLED` - Campaign is active and running
-- `PAUSED` - Campaign is paused by user
-- `DELETED` - Campaign is deleted
-
-## Iterate All Campaigns
-
-For large numbers of campaigns:
-
-```python
-for campaign in client.campaigns.iter_all():
-    print(campaign.name)
-```
+- `status` — Advertiser intent (`ENABLED` or `PAUSED`)
+- `system_status` — System serving state (`RUNNING` or `NOT_RUNNING`)
+- `display_status` — Rolled-up status (`RUNNING`, `PAUSED`, `ON_HOLD`, `LIMITED`, `PROCESSING`, `DELETED`)

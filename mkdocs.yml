@@ -1,8 +1,10 @@
 site_name: ASA API Client
-site_description: A modern, fully-typed Python client for the Apple Search Ads API
+site_description: A modern, fully-typed Python client for the Apple Ads API
 site_url: https://asa-api-client.peth.au
 repo_url: https://github.com/SamPetherbridge/asa-api-client
 repo_name: SamPetherbridge/asa-api-client
+exclude_docs: |
+  superpowers/
 
 theme:
   name: material

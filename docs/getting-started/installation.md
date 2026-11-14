@@ -8,10 +8,14 @@
 uv add asa-api-client
 ```
 
-With pandas support for DataFrame exports:
+With optional extras:
 
 ```bash
+# DataFrame export (report.to_dataframe())
 uv add "asa-api-client[pandas]"
+
+# Command-line toolkit (asa analyze / asa v1-smoke)
+uv add "asa-api-client[cli]"
 ```
 
 ## Using pip
@@ -20,26 +24,28 @@ uv add "asa-api-client[pandas]"
 pip install asa-api-client
 ```
 
-With pandas support:
+With optional extras:
 
 ```bash
 pip install "asa-api-client[pandas]"
+pip install "asa-api-client[cli]"
 ```
 
 ## Requirements
 
 - Python 3.13+
-- Valid Apple Search Ads API credentials
+- Valid Apple Ads API credentials
 
 ## Dependencies
 
-The package has minimal dependencies:
+Core runtime dependencies:
 
-- `httpx` - HTTP client with async support
-- `pydantic` - Data validation
-- `pydantic-settings` - Settings management
-- `pyjwt[crypto]` - JWT authentication
+- `httpx` — HTTP client with sync and async transports
+- `pydantic` — Request/response validation
+- `pydantic-settings` — Environment and `.env` configuration
+- `pyjwt[crypto]` — ES256 client-secret JWT signing
 
-Optional:
+Optional extras:
 
-- `pandas` - DataFrame export support
+- `pandas` — `to_dataframe()` export on report responses
+- `cli` — `typer`, `rich`, `pandas`, and `xlsxwriter` for `asa analyze` and `asa v1-smoke`

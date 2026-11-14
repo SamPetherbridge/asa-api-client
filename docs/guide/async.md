@@ -1,44 +1,39 @@
 # Async Usage
 
-The client supports both synchronous and asynchronous operations.
+`AppleAdsClient` (and legacy `AppleSearchAdsClient`) provides both synchronous and asynchronous methods on the same client instance.
 
 ## Async Context Manager
 
 ```python
 import asyncio
-from asa_api_client import AppleSearchAdsClient
 
-async def main():
-    client = AppleSearchAdsClient.from_env()
+from asa_api_client import AppleAdsClient
 
-    async with client:
-        campaigns = await client.campaigns.list_async()
-        print(f"Found {len(campaigns)} campaigns")
+
+async def main() -> None:
+    async with AppleAdsClient.from_env() as client:
+        page = await client.campaigns.query_async()
+        print(f"Fetched {len(page)} campaigns")
+
 
 asyncio.run(main())
 ```
 
-## Async Methods
+## Sync vs Async Method Pairs
 
-All resource methods have async variants with `_async` suffix:
-
-```python
-# Sync
-campaigns = client.campaigns.list()
-
-# Async
-campaigns = await client.campaigns.list_async()
-```
+Every resource method has an `_async` twin:
 
 ```python
 # Sync
 campaign = client.campaigns.get(campaign_id)
+page = client.campaigns.query()
 
 # Async
 campaign = await client.campaigns.get_async(campaign_id)
+page = await client.campaigns.query_async()
 ```
 
-## Async Iteration
+## Async Pagination
 
 ```python
 async with client:
@@ -48,33 +43,24 @@ async with client:
 
 ## Concurrent Requests
 
-Use `asyncio.gather` for concurrent operations:
+Use `asyncio.gather` to fetch multiple endpoints concurrently over a shared connection pool:
 
 ```python
-async def get_campaigns_and_reports():
-    client = AppleSearchAdsClient.from_env()
+from datetime import date
 
-    async with client:
-        campaigns, report = await asyncio.gather(
-            client.campaigns.list_async(),
-            client.reports.campaigns_async(
-                start_date=date(2024, 1, 1),
-                end_date=date(2024, 1, 31),
-            ),
+from asa_api_client.v1.models.reports import AppsReportingRequest, ReportTimeRange
+
+
+async def snapshot(client: AppleAdsClient):
+    request = AppsReportingRequest(
+        time_range=ReportTimeRange(
+            start=date(2026, 8, 1),
+            end=date(2026, 8, 31),
         )
-
-        return campaigns, report
-```
-
-## Mixed Sync/Async
-
-You can use sync methods from async code, but it's not recommended as it blocks the event loop:
-
-```python
-async with client:
-    # This blocks - avoid in async code
-    campaigns = client.campaigns.list()
-
-    # Prefer async methods
-    campaigns = await client.campaigns.list_async()
+    )
+    campaigns_page, report = await asyncio.gather(
+        client.campaigns.query_async(),
+        client.reports.campaigns_async(request),
+    )
+    return campaigns_page, report
 ```

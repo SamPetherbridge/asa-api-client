@@ -293,15 +293,19 @@ def test_get_campaign(httpx_mock, v1_client):
 def test_query_campaigns_serializes_filters(httpx_mock, v1_client):
     httpx_mock.add_response(
         url="https://api.ads.apple.com/v1/campaigns/query",
-        json={"result": [{"id": 1, "name": "A"}],
-              "pagination": {"offset": 0, "pageSize": 10, "totalCount": 1}},
+        json={
+            "result": [{"id": 1, "name": "A"}],
+            "pagination": {"offset": 0, "pageSize": 10, "totalCount": 1},
+        },
     )
     page = CampaignResource(v1_client).query(
         Query().where("status", "EQUALS", "ENABLED").page(size=10)
     )
     body = json.loads(httpx_mock.get_requests()[0].content)
-    assert body == {"filters": [{"field": "status", "operator": "EQUALS", "value": "ENABLED"}],
-                    "pagination": {"pageSize": 10, "offset": 0}}
+    assert body == {
+        "filters": [{"field": "status", "operator": "EQUALS", "value": "ENABLED"}],
+        "pagination": {"pageSize": 10, "offset": 0},
+    }
     assert len(page) == 1 and not page.has_more
 ```
 

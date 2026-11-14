@@ -1,15 +1,15 @@
 # ASA API Client
 
-A modern, fully-typed Python client for the Apple Search Ads API with async support and Pydantic models.
+A modern, fully-typed Python client for the **Apple Ads Platform API v1** (App Store and Apple Maps ads) with async support and Pydantic models. Also includes the legacy Campaign Management API v5 client (`AppleSearchAdsClient`, sunset January 26, 2027).
 
 ## Features
 
-- **Full Type Safety** - Complete type hints with strict mypy compliance
-- **Async Support** - Both sync and async methods in a unified client
-- **Pydantic Models** - Validated request/response models
-- **Resource-based API** - Intuitive `client.campaigns.list()` pattern
-- **Automatic Pagination** - `iter_all()` and `iter_all_async()` helpers
-- **Reports with Pandas** - Optional DataFrame export
+- **Full Type Safety** — Complete type hints with strict `mypy` and Pydantic v2 validation
+- **Async Support** — Sync and `_async` methods side by side on a single client
+- **Platform API v1 Coverage** — Campaigns, ad groups, keywords, ads, creatives, recommendations, insights, search-term popularity, change history, bulk operations, and Apple Maps brand ads
+- **Automatic Pagination** — `iter_all()` and `iter_all_async()` helpers plus fluent `Query` filters
+- **Reports with Pandas** — `report.to_dataframe()` across all report levels
+- **Analysis CLI** — Multi-sheet Excel performance & search-popularity workbooks via `asa analyze`
 
 ## Installation
 
@@ -26,19 +26,18 @@ pip install asa-api-client
 ## Quick Example
 
 ```python
-from asa_api_client import AppleSearchAdsClient
+from asa_api_client import AppleAdsClient
+from asa_api_client.v1 import Query
 
-client = AppleSearchAdsClient.from_env()
-
-with client:
-    campaigns = client.campaigns.list()
-    for campaign in campaigns:
-        print(f"{campaign.name}: {campaign.status}")
+with AppleAdsClient.from_env() as client:
+    enabled = client.campaigns.query(Query().where("status", "EQUALS", "ENABLED"))
+    for campaign in enabled:
+        print(f"{campaign.name}: {campaign.display_status}")
 ```
 
 ## CLI Tool
 
-For a command-line interface, see the [CLI guide](guide/cli.md).
+For Excel performance and search-popularity reporting from the terminal, see the [CLI guide](guide/cli.md).
 
 ## License
 

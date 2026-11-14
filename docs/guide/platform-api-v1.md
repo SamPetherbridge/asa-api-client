@@ -2,16 +2,16 @@
 
 Apple launched the **Apple Ads Platform API v1** (`https://api.ads.apple.com/v1`) in Summer 2026, replacing the Campaign Management API v5. **v5 sunsets on January 26, 2027** — after that date, v5 endpoints stop working entirely.
 
-This library ships both clients side by side:
+This library ships both clients side by side, with `AppleAdsClient` (v1) as the primary client:
 
-| | v5 (legacy) | v1 (current) |
+| | v1 (current) | v5 (legacy, sunset 2027-01-26) |
 |---|---|---|
-| Client class | `AppleSearchAdsClient` | `AppleAdsClient` |
-| Base URL | `api.searchads.apple.com/api/v5` | `api.ads.apple.com/v1` |
-| Request scope | `orgId` | `adAccountId` |
-| Credentials | ES256 OAuth (shared) | **Same — no changes** |
+| Client class | `AppleAdsClient` | `AppleSearchAdsClient` |
+| Base URL | `api.ads.apple.com/v1` | `api.searchads.apple.com/api/v5` |
+| Request scope | `adAccountId` (`X-AP-Context`) | `orgId` (`X-AP-Context`) |
+| Credentials | ES256 OAuth (shared) | Same key pair |
 
-Always import from the package root — the internal layout may change at the v5 sunset, the root exports will not:
+Import `AppleAdsClient` from the package root:
 
 ```python
 from asa_api_client import AppleAdsClient
@@ -19,35 +19,34 @@ from asa_api_client import AppleAdsClient
 
 ## Setup
 
-Your existing v5 credentials work unchanged. Add one new variable for the ad account (discoverable, see below):
+Your existing ES256 OAuth credentials work unchanged — add `ASA_AD_ACCOUNT_ID`:
 
 ```bash
 ASA_CLIENT_ID=SEARCHADS.xxxxxxxx-...
 ASA_TEAM_ID=YOUR_TEAM_ID
 ASA_KEY_ID=YOUR_KEY_ID
 ASA_PRIVATE_KEY_PATH=/path/to/private-key.pem
-ASA_AD_ACCOUNT_ID=123456          # new in v1 (optional at construction)
+ASA_AD_ACCOUNT_ID=123456
 ```
 
 ```python
 client = AppleAdsClient.from_env()
 ```
 
-### Discovering your ad account ID
+### Discovering Your Ad Account ID
 
-`ad_account_id` may be omitted to bootstrap — account-management endpoints work without it:
+`ad_account_id` may be omitted at construction to call bootstrap endpoints (`/v1/me`, `/v1/acls`, `/v1/orgs`):
 
 ```python
-client = AppleAdsClient.from_env()
+with AppleAdsClient.from_env() as client:
+    me = client.ad_accounts.me()
+    for acl in client.acls.list():
+        print(acl)
 
-me = client.ad_accounts.me()
-for acl in client.acls.list():
-    print(acl)
-
-client.ad_account_id = "123456"   # now account-scoped resources work
+    client.ad_account_id = "123456"
 ```
 
-Or run the bundled read-only smoke check, which auto-selects the account when there is exactly one:
+Or run the bundled read-only smoke check:
 
 ```bash
 asa v1-smoke
@@ -55,7 +54,7 @@ asa v1-smoke
 
 ## Querying
 
-v1 replaces v5's Selector/`find` with `POST <resource>/query` and a filter grammar. Use the `Query` builder:
+v1 replaces v5's `Selector` / `find` with `POST <resource>/query` and a structured filter grammar. Use the `Query` builder:
 
 ```python
 from asa_api_client.v1 import Query
@@ -70,85 +69,91 @@ page = client.campaigns.query(
 for campaign in page:
     print(campaign.name)
 
-# Automatic pagination
+# Automatic pagination across all pages
 for campaign in client.campaigns.iter_all():
     print(campaign.name)
 ```
 
-Filters combine with logical AND. `totalCount` is only returned when you ask for it (`fetch_total_count=True`); `iter_all()` handles this for you.
+Filters combine with logical AND. `totalCount` is returned when `fetch_total_count=True`; `iter_all()` paginates automatically until a short page is returned.
 
 ## Resources
 
 Account-scoped parity resources: `campaigns`, `ad_groups`, `keywords`, `negative_keywords`, `ads`, `creatives`, `assets`, `product_pages`, `budget_orders`, `apps`, `geo`, `reports`.
 
-New in v1:
+v1-exclusive capabilities:
 
-- **`recommendations`** — target-CPA and daily-budget recommendations with `apply`/`dismiss`
-- **`suggestions`** — keyword, phrase, category, and target-CPA suggestions
-- **`insights`** — impression share and **search term popularity** reports
-- **`change_history`** — the audit trail of account changes
-- **`bulk`** — bulk keyword / negative-keyword create and update
-- **Apple Maps ads** — `brands`, `locations`, `location_groups`, `business_categories`, `brand_reports`
+- **`recommendations`** — Target-CPA and daily-budget recommendations with `apply` / `dismiss`
+- **`suggestions`** — Keyword, phrase, category, and target-CPA suggestions
+- **`insights`** — Impression share and **search term popularity** reports
+- **`change_history`** — Account audit trail
+- **`bulk`** — Bulk keyword and negative-keyword `create_*`, `update_*`, and `delete_*` (up to 5,000 items per call)
+- **Apple Maps ads** — `brands`, `locations`, `location_groups`, `business_categories`, `brand_rejection_reasons`, `brand_reports`
 
-Every sync method has an `_async` twin, exactly like the v5 client.
+Every sync method has an `_async` twin.
 
-## Error handling
+## Error Handling & Bulk Operations
 
-v1 responses can carry an `error` block even on HTTP 200 (notably partial failures in bulk operations). The v1 client **always raises** in that case — `PartialFailureError` exposes the per-item `details` list — so a write can never silently half-succeed:
+Responses carrying a top-level `error` block on HTTP 2xx raise `PartialFailureError` (exposing `exc.details`), so failures never pass silently. In bulk operations with `allow_partial_success=True` (the default), Apple returns per-item `success` and `error` entries on each `BulkItemResult`:
 
 ```python
 from asa_api_client import PartialFailureError
 
 try:
-    client.bulk.create_keywords(items, allow_partial_success=False)
+    results = client.bulk.delete_keywords([101, 102], allow_partial_success=True)
+    for item in results:
+        if not item.success and item.error:
+            print(item.correlation_id, item.error.code, item.error.message)
 except PartialFailureError as exc:
     for detail in exc.details:
-        print(detail["code"], detail["message"])
+        print(detail.get("code"), detail.get("message"))
 ```
 
-All other exceptions (`AuthenticationError`, `RateLimitError`, ...) behave as in v5, including automatic retry with backoff on 429/5xx — and in v1 the retry also covers `POST .../query` calls, which are idempotent reads.
+Automatic retries with exponential backoff cover transient 429/5xx errors on `GET` requests as well as idempotent `POST .../query` reads.
 
 ## Reports
 
-v1 reports use a `timeRange` object and return `rows` with `totalMetrics`/`granularMetrics`:
+v1 reports accept an `AppsReportingRequest` (or `BrandsReportingRequest` on `client.brand_reports`) and support `to_dataframe()` / `to_records()`:
 
 ```python
-from asa_api_client.v1.models.reports import AppsReportingRequest, ReportTimeRange
+from datetime import date
+
+from asa_api_client.v1.models.reports import (
+    AppsReportingRequest,
+    ReportGranularity,
+    ReportTimeRange,
+)
 
 report = client.reports.campaigns(
     AppsReportingRequest(
         time_range=ReportTimeRange(
             start=date(2026, 8, 1),
             end=date(2026, 8, 7),
-            granularity="DAILY",
-        ),
+            granularity=ReportGranularity.DAILY,
+        )
     )
 )
+df = report.to_dataframe()
 ```
-
-Ad-group, keyword, search-term, and ad-level reports follow the same shape (`client.reports.ad_groups(...)` etc.), and Apple Maps ads reporting lives on `client.brand_reports`.
-
-(See the model docstrings for the exact request shapes — they follow the official docs field-for-field.)
 
 ## CLI
 
-`asa analyze` and the analysis pipeline accept `--api-version`:
+`asa analyze` uses Platform API v1 by default (pass `--api-version v5` only if you specifically need legacy v5 before the sunset):
 
 ```bash
-asa analyze --api-version v1 --period 30d
-asa v1-smoke        # read-only live validation of the v1 integration
+asa analyze --period 30d
+asa v1-smoke
 ```
 
-The default remains `v5` until the sunset.
-
-## Migration crib (v5 → v1)
+## Migration Crib (v5 → v1)
 
 | v5 | v1 |
 |---|---|
+| `AppleSearchAdsClient` | `AppleAdsClient` |
 | `client.campaigns.list()` | `client.campaigns.query()` / `iter_all()` |
 | `Selector().where("status", "==", "ENABLED")` | `Query().where("status", "EQUALS", "ENABLED")` |
-| `ACTIVE` status | `ENABLED` |
+| `ACTIVE` keyword status | `ENABLED` |
 | `adamId` | `promotedObjectId` + `promotedObjectType` |
 | `defaultBidAmount` | `bidStrategy.bid` |
-| `limit`/`offset` | `pageSize`/`offset` (+ `fetchTotalCount`) |
-| Lifetime budget, `cpaCap` | Removed — do not use |
+| `limit` / `offset` | `pageSize` / `offset` (+ `fetchTotalCount`) |
+| Nested `client.campaigns(id).ad_groups` | Flat `client.ad_groups` + `campaignId` filter |
+| Lifetime budget, `cpaCap` | Removed — use `dailyBudget` / `bidStrategy` |

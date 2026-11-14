@@ -5,16 +5,16 @@
 [![License](https://img.shields.io/github/license/SamPetherbridge/asa-api-client.svg)](https://github.com/SamPetherbridge/asa-api-client/blob/main/LICENSE)
 [![CI](https://github.com/SamPetherbridge/asa-api-client/actions/workflows/ci.yml/badge.svg)](https://github.com/SamPetherbridge/asa-api-client/actions/workflows/ci.yml)
 
-A modern, fully-typed Python client for the Apple Ads APIs with async support and Pydantic models — covering both the new **Apple Ads Platform API v1** and the legacy Campaign Management API v5 (sunset January 26, 2027).
+A modern, fully-typed Python client for the **Apple Ads Platform API v1** (App Store and Apple Maps ads) with async support and Pydantic models. Also ships the legacy Campaign Management API v5 client (`AppleSearchAdsClient`) ahead of Apple's **January 26, 2027** v5 sunset.
 
 ## Features
 
-- **Full Type Safety** - Complete type hints with strict mypy compliance
-- **Async Support** - Both sync and async methods in a unified client
-- **Pydantic Models** - Validated request/response models
-- **Resource-based API** - Intuitive `client.campaigns.list()` pattern
-- **Automatic Pagination** - `iter_all()` and `iter_all_async()` helpers
-- **Reports with Pandas** - Optional DataFrame export
+- **Full Type Safety** — Complete type hints with strict `mypy` + Pydantic v2 compliance
+- **Platform API v1 First** — Campaigns, ad groups, keywords, ads, creatives, recommendations, insights, search-term popularity, change history, bulk operations, and Apple Maps brand ads
+- **Sync & Async** — Every method has an `_async` counterpart on the same client
+- **Automatic Pagination** — `iter_all()` and `iter_all_async()` helpers plus fluent `Query` builder
+- **Reports with Pandas** — Optional `report.to_dataframe()` export across all v1 and v5 report levels
+- **Analysis CLI** — Generate multi-sheet Excel performance & search-popularity workbooks via `asa analyze`
 
 ## Installation
 
@@ -30,87 +30,64 @@ Using pip:
 pip install asa-api-client
 ```
 
-With pandas support:
+Optional extras:
 
 ```bash
+# DataFrame export (report.to_dataframe())
 uv add "asa-api-client[pandas]"
-# or
-pip install "asa-api-client[pandas]"
+
+# Excel analysis CLI (asa analyze / asa v1-smoke)
+uv add "asa-api-client[cli]"
 ```
 
 ## Quick Start
 
 ```python
-from asa_api_client import AppleSearchAdsClient
-
-# From environment variables
-client = AppleSearchAdsClient.from_env()
-
-# Or explicit configuration
-client = AppleSearchAdsClient(
-    client_id="SEARCHADS.xxx",
-    team_id="SEARCHADS.xxx",
-    key_id="xxx",
-    org_id=123456,
-    private_key_path="private-key.pem",
-)
-
-# List campaigns
-with client:
-    campaigns = client.campaigns.list()
-    for campaign in campaigns:
-        print(f"{campaign.name}: {campaign.status}")
-```
-
-## Platform API v1
-
-Apple's new [Platform API v1](https://developer.apple.com/documentation/apple-ads-platform-api) replaces v5 (which stops working on **2027-01-26**). The v1 client ships alongside the v5 client with the same credentials — just add your ad account ID:
-
-```python
 from asa_api_client import AppleAdsClient
 from asa_api_client.v1 import Query
 
-client = AppleAdsClient.from_env()  # reads ASA_* plus ASA_AD_ACCOUNT_ID
+# Reads ASA_* variables from the environment or .env
+client = AppleAdsClient.from_env()
+
+# Or pass credentials explicitly
+client = AppleAdsClient(
+    client_id="SEARCHADS.xxx",
+    team_id="TEAM123",
+    key_id="KEY123",
+    ad_account_id="123456",
+    private_key_path="private-key.pem",
+)
 
 with client:
-    # Flat query-based API with typed filters
     enabled = client.campaigns.query(Query().where("status", "EQUALS", "ENABLED"))
-
-    # v1-only features
-    recs = client.recommendations
-    popularity = client.insights
-    history = client.change_history
-    bulk = client.bulk
+    for campaign in enabled:
+        print(f"{campaign.id}: {campaign.name} ({campaign.display_status})")
 ```
 
-Don't know your ad account ID? Run the read-only smoke check — it discovers accounts and validates the whole integration against the live API:
+Don't know your `ad_account_id` yet? Discover accessible accounts with the bundled read-only smoke check:
 
 ```bash
 asa v1-smoke
 ```
 
-See the [Platform API v1 guide](https://asa-api-client.peth.au/guide/platform-api-v1/) for the full migration crib and resource reference. Import v1 symbols from the package root (`AppleAdsClient`) — internal layout may change when v5 is removed.
-
 ## Environment Variables
 
 ```bash
 export ASA_CLIENT_ID="SEARCHADS.your-client-id"
-export ASA_TEAM_ID="SEARCHADS.your-team-id"
+export ASA_TEAM_ID="your-team-id"
 export ASA_KEY_ID="your-key-id"
-export ASA_ORG_ID="123456"
+export ASA_AD_ACCOUNT_ID="123456"
 export ASA_PRIVATE_KEY_PATH="/path/to/private-key.pem"
-export ASA_AD_ACCOUNT_ID="123456"  # Platform API v1 only
 ```
 
 Or use a `.env` file:
 
 ```bash
 ASA_CLIENT_ID=SEARCHADS.your-client-id
-ASA_TEAM_ID=SEARCHADS.your-team-id
+ASA_TEAM_ID=your-team-id
 ASA_KEY_ID=your-key-id
-ASA_ORG_ID=123456
+ASA_AD_ACCOUNT_ID=123456
 ASA_PRIVATE_KEY_PATH=private-key.pem
-ASA_AD_ACCOUNT_ID=123456  # Platform API v1 only
 ```
 
 ## Resources
@@ -118,62 +95,97 @@ ASA_AD_ACCOUNT_ID=123456  # Platform API v1 only
 ### Campaigns
 
 ```python
-# List all campaigns
-campaigns = client.campaigns.list()
+from asa_api_client.v1 import Query
+from asa_api_client.v1.models.base import Money
+from asa_api_client.v1.models.campaigns import (
+    BillingEvent,
+    CampaignCreate,
+    CampaignTargeting,
+    CampaignUpdate,
+    DailyBudget,
+    PromotedObjectType,
+)
+from asa_api_client.v1.models.shared import TargetingData
+
+# Query or iterate all campaigns
+page = client.campaigns.query(Query().where("status", "EQUALS", "ENABLED"))
+all_campaigns = list(client.campaigns.iter_all())
 
 # Get a specific campaign
 campaign = client.campaigns.get(campaign_id)
 
-# Find with filters
-from asa_api_client.models import Selector
-enabled = client.campaigns.find(
-    Selector().where("status", "==", "ENABLED")
+# Create an App Store campaign
+created = client.campaigns.create(
+    CampaignCreate(
+        ad_account_id=123456,
+        name="US Search",
+        billing_event=BillingEvent.TAPS,
+        promoted_object_type=PromotedObjectType.APPSTORE_APP,
+        promoted_object_id="987654321",
+        daily_budget=DailyBudget(value=Money(amount="100.00", currency="USD")),
+        targeting=CampaignTargeting(
+            supply_source=TargetingData(include=["APPSTORE"]),
+            supply_placement=TargetingData(include=["APPSTORE_SEARCH_RESULTS"]),
+            country_or_region=TargetingData(include=["US"]),
+        ),
+    )
 )
 
-# Create a campaign
-from asa_api_client.models import CampaignCreate, Money, CampaignSupplySource
-campaign = client.campaigns.create(
-    CampaignCreate(
-        name="My Campaign",
-        adam_id=123456789,
-        countries_or_regions=["US"],
-        daily_budget_amount=Money(amount="100", currency="USD"),
-        supply_sources=[CampaignSupplySource.APPSTORE_SEARCH_RESULTS],
-    )
+# Update daily budget
+client.campaigns.update(
+    campaign_id,
+    CampaignUpdate(daily_budget=DailyBudget(value=Money(amount="150.00", currency="USD"))),
 )
 ```
 
 ### Ad Groups
 
 ```python
-# Access ad groups through campaign
-ad_groups = client.campaigns(campaign_id).ad_groups.list()
+from asa_api_client.v1.models.ad_groups import AdGroupCreate, PricingModel
+from asa_api_client.v1.models.shared import BidStrategy, BidStrategyGoal, BidStrategyType
 
-# Create an ad group
-from asa_api_client.models import AdGroupCreate
-ad_group = client.campaigns(campaign_id).ad_groups.create(
+ad_groups = client.ad_groups.query(Query().where("campaignId", "EQUALS", str(campaign_id)))
+
+ad_group = client.ad_groups.create(
     AdGroupCreate(
-        name="My Ad Group",
-        default_bid_amount=Money(amount="1.00", currency="USD"),
+        name="Exact Core",
+        campaign_id=campaign_id,
+        pricing_model=PricingModel.CPT,
+        bid_strategy=BidStrategy(
+            bid_strategy_type=BidStrategyType.MANUAL_CPT,
+            bid_strategy_goal=BidStrategyGoal.TAP,
+            bid=Money(amount="1.50", currency="USD"),
+        ),
     )
 )
 ```
 
-### Keywords
+### Keywords & Bulk Operations
 
 ```python
-# List keywords in an ad group
-keywords = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.list()
+from asa_api_client.v1.models.bulk import BulkKeywordUpdate
+from asa_api_client.v1.models.keywords import KeywordCreate, KeywordMatchType
 
-# Create keywords (bulk only)
-from asa_api_client.models import KeywordCreate, KeywordMatchType
-result = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.create_bulk([
-    KeywordCreate(
-        text="my keyword",
-        match_type=KeywordMatchType.EXACT,
-        bid_amount=Money(amount="1.50", currency="USD"),
-    )
-])
+# Query keywords in an ad group
+keywords = client.keywords.query(Query().where("adGroupId", "EQUALS", str(ad_group_id)))
+
+# Bulk create, update, and delete keywords
+created = client.bulk.create_keywords(
+    [
+        KeywordCreate(
+            ad_group_id=ad_group_id,
+            text="budget tracker",
+            match_type=KeywordMatchType.EXACT,
+            bid=Money(amount="1.75", currency="USD"),
+        )
+    ]
+)
+
+client.bulk.update_keywords(
+    [BulkKeywordUpdate(id=keyword_id, bid=Money(amount="2.00", currency="USD"))]
+)
+
+client.bulk.delete_keywords([keyword_id])
 ```
 
 ### Reports
@@ -181,13 +193,23 @@ result = client.campaigns(campaign_id).ad_groups(ad_group_id).keywords.create_bu
 ```python
 from datetime import date
 
-# Campaign report
-report = client.reports.campaigns(
-    start_date=date(2024, 1, 1),
-    end_date=date(2024, 1, 31),
+from asa_api_client.v1.models.reports import (
+    AppsReportingRequest,
+    ReportGranularity,
+    ReportTimeRange,
 )
 
-# Convert to DataFrame (requires pandas)
+report = client.reports.campaigns(
+    AppsReportingRequest(
+        time_range=ReportTimeRange(
+            start=date(2026, 8, 1),
+            end=date(2026, 8, 31),
+            granularity=ReportGranularity.DAILY,
+        )
+    )
+)
+
+# Convert to a pandas DataFrame (requires asa-api-client[pandas])
 df = report.to_dataframe()
 ```
 
@@ -196,29 +218,32 @@ df = report.to_dataframe()
 ```python
 import asyncio
 
-async def main():
-    client = AppleSearchAdsClient.from_env()
+from asa_api_client import AppleAdsClient
 
-    async with client:
-        campaigns = await client.campaigns.list_async()
 
-        # Async iteration
+async def main() -> None:
+    async with AppleAdsClient.from_env() as client:
         async for campaign in client.campaigns.iter_all_async():
             print(campaign.name)
+
 
 asyncio.run(main())
 ```
 
 ## CLI
 
-Generate a formatted Excel analysis workbook with the included `asa analyze` CLI:
+Generate a formatted Excel performance and search-popularity workbook with `asa analyze`:
 
 ```bash
 pip install "asa-api-client[cli]"
 asa analyze --period 90d --output report.xlsx
 ```
 
-The workbook includes a summary sheet with KPIs and trends, formatted analysis sheets per reporting level, and raw daily data for pivoting. For details, see the [CLI guide](https://asa-api-client.peth.au/guide/cli/).
+`asa analyze` uses the Platform API v1 by default (and auto-selects your ad account from `/v1/acls` when `ASA_AD_ACCOUNT_ID` is omitted). For full details, see the [CLI guide](https://asa-api-client.peth.au/guide/cli/).
+
+## Legacy Campaign Management API v5
+
+`AppleSearchAdsClient` remains available for legacy v5 workflows until Apple shuts down v5 on **January 26, 2027** (`AppleSearchAdsClient` emits a `DeprecationWarning` on construction). See the [Platform API v1 migration guide](https://asa-api-client.peth.au/guide/platform-api-v1/) when migrating existing v5 code.
 
 ## License
 
