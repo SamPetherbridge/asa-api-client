@@ -58,14 +58,38 @@ class TestRootExport:
     """Tests for the public import surface."""
 
     def test_importable_from_package_root(self) -> None:
-        """Test the root-exports-only public API rule."""
+        """Test top-level exports on asa_api_client."""
+        import asa_api_client
         from asa_api_client import AppleAdsClient as RootClient
+        from asa_api_client import Query
+        from asa_api_client.v1 import Query as V1Query
 
         assert RootClient is AppleAdsClient
+        assert Query is V1Query
+        assert not hasattr(asa_api_client, "AppleSearchAdsClient")
 
 
 class TestFromEnv:
-    """Tests for from_env construction."""
+    """Tests for from_env and from_settings construction."""
+
+    def test_from_settings(self, monkeypatch: pytest.MonkeyPatch, ec_private_key_pem: str) -> None:
+        """Test constructing a client from a Settings object without org_id."""
+        from pydantic import SecretStr
+
+        from asa_api_client import Settings
+
+        monkeypatch.delenv("ASA_PRIVATE_KEY_PATH", raising=False)
+        monkeypatch.delenv("ASA_ORG_ID", raising=False)
+        settings = Settings(
+            _env_file=None,
+            client_id="SEARCHADS.test",
+            team_id="TEAM123",
+            key_id="KEY123",
+            ad_account_id="54321",
+            private_key=SecretStr(ec_private_key_pem),
+        )
+        client = AppleAdsClient.from_settings(settings)
+        assert client.ad_account_id == "54321"
 
     def test_from_env_reads_ad_account_id(
         self, monkeypatch: pytest.MonkeyPatch, ec_private_key_pem: str

@@ -13,20 +13,19 @@ from rich.progress import BarColumn, Progress, TaskID, TextColumn
 from xlsxwriter.exceptions import XlsxWriterException
 
 from asa_api_client.cli import dates, fetch, metrics, popularity, v1_smoke
-from asa_api_client.cli.v1_adapter import V1FetchAdapter
 from asa_api_client.cli.workbook import SummaryData, write_workbook
-from asa_api_client.client import AppleSearchAdsClient
-from asa_api_client.exceptions import AppleSearchAdsError, ConfigurationError
+from asa_api_client.exceptions import AppleAdsError, ConfigurationError
 from asa_api_client.v1.client import AppleAdsClient
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
-app.command("v1-smoke")(v1_smoke.command)
+app.command("smoke")(v1_smoke.command)
+app.command("v1-smoke", hidden=True)(v1_smoke.command)
 _err = Console(stderr=True)
 
 
 @app.callback()
 def _root() -> None:
-    """Apple Search Ads analysis toolkit."""
+    """Apple Ads analysis toolkit."""
 
 
 class Period(StrEnum):
@@ -35,13 +34,6 @@ class Period(StrEnum):
     D30 = "30d"
     D90 = "90d"
     D365 = "365d"
-
-
-class ApiVersion(StrEnum):
-    """Selectable Apple Ads API backends."""
-
-    V5 = "v5"
-    V1 = "v1"
 
 
 _CURRENCY_FORMATS = {
@@ -74,13 +66,8 @@ def _fail(message: str) -> "typer.Exit":
     return typer.Exit(code=1)
 
 
-def _resolve_v1_account(client: AppleAdsClient) -> None:
-    """Auto-select an ad account from ACLs when ``ASA_AD_ACCOUNT_ID`` is unset."""
-    client.resolve_ad_account()
-
-
 async def _fetch(
-    client: fetch.FetchClient,
+    client: AppleAdsClient,
     meta: pd.DataFrame,
     start: date,
     end: date,
@@ -134,10 +121,6 @@ def analyze(
         str | None,
         typer.Option("--currency-format", help="Excel number format for money."),
     ] = None,
-    api_version: Annotated[
-        ApiVersion,
-        typer.Option("--api-version", help="Apple Ads API version to fetch with."),
-    ] = ApiVersion.V1,
 ) -> None:
     """Generate an Excel performance analysis workbook."""
     today = datetime.now(tz=UTC).date()
@@ -151,21 +134,14 @@ def analyze(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    client: AppleSearchAdsClient | V1FetchAdapter
-    resolved_account_id: str | None = None
     try:
-        if api_version is ApiVersion.V1:
-            v1_client = AppleAdsClient.from_env()
-            try:
-                _resolve_v1_account(v1_client)
-            except BaseException:
-                v1_client.close()
-                raise
-            resolved_account_id = v1_client.ad_account_id
-            client = V1FetchAdapter(v1_client)
-        else:
-            client = AppleSearchAdsClient.from_env()
-    except (ConfigurationError, AppleSearchAdsError) as exc:
+        client = AppleAdsClient.from_env()
+        try:
+            resolved_account_id = client.resolve_ad_account()
+        except BaseException:
+            client.close()
+            raise
+    except (ConfigurationError, AppleAdsError) as exc:
         raise _fail(str(exc)) from exc
 
     try:
@@ -180,7 +156,7 @@ def analyze(
         raise _fail(str(exc)) from exc
     except fetch.LevelFetchError as exc:
         raise _fail(str(exc)) from exc
-    except AppleSearchAdsError as exc:
+    except AppleAdsError as exc:
         raise _fail(str(exc)) from exc
     finally:
         client.close()
@@ -211,7 +187,7 @@ def analyze(
     fmt = currency_format or _currency_format(currency)
 
     summary = SummaryData(
-        title=f"{scope_label} · Apple Search Ads performance",
+        title=f"{scope_label} · Apple Ads performance",
         period_label=f"{start} – {end} ({day_count} days)",  # noqa: RUF001
         timezone=timezone,
         generated_at=datetime.now(tz=UTC),
@@ -223,18 +199,16 @@ def analyze(
         wasted=metrics.wasted_spend(analysis["keywords"]),
     )
 
-    # The popularity sheet is enrichment via the v1 insights API; it
-    # must never break (or fail) an otherwise successful analyze run.
     def _popularity_factory() -> AppleAdsClient:
         pop_client = AppleAdsClient.from_env()
-        if pop_client.ad_account_id is None and resolved_account_id is not None:
+        if pop_client.ad_account_id is None:
             pop_client.ad_account_id = resolved_account_id
         return pop_client
 
     try:
         popularity_frame, popularity_notes = popularity.build_popularity(
             result,
-            client_factory=_popularity_factory if resolved_account_id is not None else None,
+            client_factory=_popularity_factory,
         )
     except Exception as exc:  # nothing from this sheet may abort the workbook
         popularity_frame, popularity_notes = pd.DataFrame(), []

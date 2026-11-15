@@ -1,7 +1,6 @@
 """Tests for the Search Popularity enrichment (``cli.popularity``)."""
 
 import json
-import re
 from collections.abc import Callable
 from datetime import date, timedelta
 from pathlib import Path
@@ -18,14 +17,7 @@ from typer.testing import CliRunner
 from asa_api_client.cli import fetch, popularity
 from asa_api_client.cli.analyze import app
 from asa_api_client.v1.client import AppleAdsClient
-from tests.unit.cli.conftest import (
-    API,
-    TOKEN_URL,
-    campaigns_json,
-    report_json,
-    report_row,
-    token_json,
-)
+from tests.unit.cli.conftest import TOKEN_URL, mock_v1_api, token_json
 
 V1 = "https://api.ads.apple.com/v1"
 ACLS_URL = f"{V1}/acls"
@@ -344,33 +336,6 @@ class TestBuildPopularity:
         assert any("feature not enabled" in note for note in notes)
 
 
-def _mock_v5_api(httpx_mock: HTTPXMock) -> None:
-    """Mock the v5 endpoints the analyze fetch pipeline hits."""
-    httpx_mock.add_response(url=TOKEN_URL, json=token_json(), is_reusable=True)
-    httpx_mock.add_response(
-        url=f"{API}/campaigns?limit=1000&offset=0", json=campaigns_json(), is_reusable=True
-    )
-    httpx_mock.add_response(
-        url=re.compile(rf"{API}/search/apps\?.*"), json={"data": []}, is_reusable=True
-    )
-    rows = [
-        report_row(
-            {"campaignId": 1, "campaignName": "Campaign One"},
-            [("2026-07-01", 1000, 100, 10, "50.0")],
-        )
-    ]
-    httpx_mock.add_response(
-        url=f"{API}/reports/campaigns", json=report_json(rows), is_reusable=True
-    )
-    for cid in (1, 2):
-        for tail in ("adgroups", "keywords", "searchterms", "ads"):
-            httpx_mock.add_response(
-                url=f"{API}/reports/campaigns/{cid}/{tail}",
-                json=report_json(rows),
-                is_reusable=True,
-            )
-
-
 @pytest.mark.httpx_mock(assert_all_responses_were_requested=False)
 class TestAnalyzeWiring:
     """asa analyze integration with the popularity sheet."""
@@ -386,10 +351,10 @@ class TestAnalyzeWiring:
             raise RuntimeError("popularity exploded")
 
         monkeypatch.setattr(popularity, "build_popularity", _boom)
-        _mock_v5_api(httpx_mock)
+        mock_v1_api(httpx_mock)
         out = tmp_path / "report.xlsx"
 
-        result = runner.invoke(app, ["analyze", "--api-version", "v5", "--output", str(out)])
+        result = runner.invoke(app, ["analyze", "--output", str(out)])
 
         assert result.exit_code == 0, result.output
         combined = result.output + (result.stderr or "")
@@ -422,10 +387,10 @@ class TestAnalyzeWiring:
             return frame, ["Popularity week: 2026-08-09 – 2026-08-15"]  # noqa: RUF001
 
         monkeypatch.setattr(popularity, "build_popularity", _fake)
-        _mock_v5_api(httpx_mock)
+        mock_v1_api(httpx_mock)
         out = tmp_path / "report.xlsx"
 
-        result = runner.invoke(app, ["analyze", "--api-version", "v5", "--output", str(out)])
+        result = runner.invoke(app, ["analyze", "--output", str(out)])
 
         assert result.exit_code == 0, result.output
         ws = load_workbook(out)["Search Popularity"]

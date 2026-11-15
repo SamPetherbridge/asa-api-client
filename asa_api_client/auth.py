@@ -112,7 +112,7 @@ class Authenticator:
         client_id: str,
         team_id: str,
         key_id: str,
-        org_id: int,
+        org_id: int | None = None,
         private_key: str | None = None,
         private_key_path: Path | str | None = None,
     ) -> None:
@@ -121,10 +121,10 @@ class Authenticator:
         You must provide either `private_key` or `private_key_path`.
 
         Args:
-            client_id: Your Apple Search Ads API client ID.
+            client_id: Your Apple Ads API client ID.
             team_id: Your Apple Developer team ID.
             key_id: The key ID for your private key.
-            org_id: Your Apple Search Ads organization ID.
+            org_id: Optional Apple Ads organization ID.
             private_key: The private key as a PEM-encoded string.
             private_key_path: Path to the private key PEM file.
 
@@ -135,7 +135,7 @@ class Authenticator:
         self.client_id = client_id
         self.team_id = team_id
         self.key_id = key_id
-        self.org_id = org_id
+        self.org_id = org_id or 0
 
         self._private_key = self._load_private_key(private_key, private_key_path)
         self._access_token: AccessToken | None = None

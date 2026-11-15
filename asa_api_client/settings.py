@@ -1,24 +1,23 @@
-"""Settings management for the Apple Search Ads API client.
+"""Settings management for the Apple Ads API client.
 
-This module provides a Settings class that loads configuration from
-environment variables and `.env` files using pydantic-settings.
+This module provides a ``Settings`` class that loads configuration from
+environment variables and ``.env`` files using ``pydantic-settings``.
 
 Example:
-    Create a `.env` file in your project root::
+    Create a ``.env`` file in your project root::
 
         ASA_CLIENT_ID=SEARCHADS.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
         ASA_TEAM_ID=YOUR_TEAM_ID
         ASA_KEY_ID=YOUR_KEY_ID
-        ASA_ORG_ID=123456
+        ASA_AD_ACCOUNT_ID=123456
         ASA_PRIVATE_KEY_PATH=/path/to/private-key.pem
 
     Then load settings::
 
-        from asa_api_client.settings import Settings
+        from asa_api_client import AppleAdsClient, Settings
 
         settings = Settings()
-        # Or specify a custom env file
-        settings = Settings(_env_file=".env.production")
+        client = AppleAdsClient.from_settings(settings)
 """
 
 from pathlib import Path
@@ -29,34 +28,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Apple Search Ads API configuration settings.
+    """Apple Ads Platform API v1 configuration settings.
 
-    Settings are loaded from environment variables and `.env` files.
-    Environment variables take precedence over `.env` file values.
+    Settings are loaded from environment variables and ``.env`` files.
+    Environment variables take precedence over ``.env`` file values.
 
     Attributes:
-        client_id: Your Apple Search Ads API client ID (SEARCHADS.xxx).
+        client_id: Your Apple Ads API client ID (``SEARCHADS.xxx``).
         team_id: Your Apple Developer team ID.
         key_id: The key ID for your private key.
-        org_id: Your Apple Search Ads organization ID.
+        ad_account_id: Optional Apple Ads ad account ID for request scoping
+            (may be omitted at bootstrap and resolved via ``/v1/acls``).
+        org_id: Optional organization ID (used as a preference hint during
+            account discovery when ``ad_account_id`` is unset).
         private_key: The private key as a PEM-encoded string (secret).
         private_key_path: Path to the private key PEM file.
-
-    Example:
-        Load from environment and `.env` file::
-
-            settings = Settings()
-
-        Load from a specific env file::
-
-            settings = Settings(_env_file=".env.production")
-
-        Access values::
-
-            print(settings.client_id)
-            print(settings.org_id)
-            # Private key is a SecretStr, use get_secret_value()
-            key = settings.private_key.get_secret_value()
     """
 
     model_config = SettingsConfigDict(
@@ -67,10 +53,17 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    client_id: str = Field(description="Apple Search Ads API client ID (starts with SEARCHADS.)")
+    client_id: str = Field(description="Apple Ads API client ID (starts with SEARCHADS.)")
     team_id: str = Field(description="Apple Developer team ID")
     key_id: str = Field(description="API key identifier")
-    org_id: int = Field(description="Apple Search Ads organization ID")
+    ad_account_id: str | None = Field(
+        default=None,
+        description="Apple Ads ad account ID for X-AP-Context scoping",
+    )
+    org_id: int | None = Field(
+        default=None,
+        description="Optional organization ID (fallback preference for account discovery)",
+    )
     private_key: SecretStr | None = Field(
         default=None,
         description="Private key as PEM-encoded string",
@@ -80,14 +73,14 @@ class Settings(BaseSettings):
         description="Path to private key PEM file",
     )
 
-    @field_validator("client_id")
+    @field_validator("ad_account_id", mode="before")
     @classmethod
-    def validate_client_id(cls, v: str) -> str:
-        """Validate that client_id has the expected format."""
-        if not v.startswith("SEARCHADS."):
-            # Just warn, don't fail - Apple might change formats
-            pass
-        return v
+    def normalize_ad_account_id(cls, v: object) -> str | None:
+        """Normalize numeric or whitespace-padded account IDs to clean strings."""
+        if v is None:
+            return None
+        text = str(v).strip()
+        return text or None
 
     @model_validator(mode="after")
     def validate_private_key_source(self) -> Self:

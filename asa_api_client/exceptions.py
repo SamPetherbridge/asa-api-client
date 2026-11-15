@@ -1,19 +1,19 @@
-"""Custom exceptions for the Apple Search Ads API client.
+"""Custom exceptions for the Apple Ads API client.
 
 This module defines a hierarchy of exceptions that can be raised when
-interacting with the Apple Search Ads API. All exceptions inherit from
-`AppleSearchAdsError` for easy catching of any API-related error.
+interacting with the Apple Ads Platform API v1. All exceptions inherit from
+``AppleAdsError`` (also aliased as ``AppleSearchAdsError``) for easy
+catching of any API-related error.
 
 Example:
     Handling specific exceptions::
 
-        from asa_api_client import AppleSearchAdsClient
-        from asa_api_client.exceptions import NotFoundError, RateLimitError
+        from asa_api_client import AppleAdsClient, NotFoundError, RateLimitError
 
-        client = AppleSearchAdsClient(...)
+        client = AppleAdsClient.from_env()
 
         try:
-            campaign = client.campaigns.get(campaign_id=12345)
+            campaign = client.campaigns.get(12345)
         except NotFoundError:
             print("Campaign not found")
         except RateLimitError as e:
@@ -23,8 +23,8 @@ Example:
 from typing import Any
 
 
-class AppleSearchAdsError(Exception):
-    """Base exception for all Apple Search Ads API errors.
+class AppleAdsError(Exception):
+    """Base exception for all Apple Ads API errors.
 
     All exceptions raised by this library inherit from this class,
     making it easy to catch any API-related error.
@@ -61,7 +61,11 @@ class AppleSearchAdsError(Exception):
         return self.message
 
 
-class AuthenticationError(AppleSearchAdsError):
+# Backwards-compatible alias for code written against 0.x releases.
+AppleSearchAdsError = AppleAdsError
+
+
+class AuthenticationError(AppleAdsError):
     """Raised when authentication fails.
 
     This can occur due to:
@@ -74,17 +78,17 @@ class AuthenticationError(AppleSearchAdsError):
         Handling authentication errors::
 
             try:
-                client = AppleSearchAdsClient(
+                client = AppleAdsClient(
                     client_id="invalid",
                     ...
                 )
-                client.campaigns.list()
+                client.campaigns.query()
             except AuthenticationError as e:
                 print(f"Auth failed: {e}")
     """
 
 
-class AuthorizationError(AppleSearchAdsError):
+class AuthorizationError(AppleAdsError):
     """Raised when the user lacks permission for an action.
 
     This occurs when the authenticated user doesn't have the required
@@ -92,12 +96,12 @@ class AuthorizationError(AppleSearchAdsError):
 
     Common causes:
     - Insufficient API role (e.g., read-only trying to write)
-    - Organization access restrictions
+    - Ad account access restrictions
     - Campaign-level permission limitations
     """
 
 
-class NotFoundError(AppleSearchAdsError):
+class NotFoundError(AppleAdsError):
     """Raised when a requested resource is not found.
 
     This typically occurs when:
@@ -109,13 +113,13 @@ class NotFoundError(AppleSearchAdsError):
         Handling not found errors::
 
             try:
-                campaign = client.campaigns.get(campaign_id=99999)
+                campaign = client.campaigns.get(99999)
             except NotFoundError:
                 print("Campaign does not exist")
     """
 
 
-class ValidationError(AppleSearchAdsError):
+class ValidationError(AppleAdsError):
     """Raised when request validation fails.
 
     This occurs when:
@@ -147,12 +151,11 @@ class ValidationError(AppleSearchAdsError):
         self.field_errors = field_errors or {}
 
 
-class RateLimitError(AppleSearchAdsError):
+class RateLimitError(AppleAdsError):
     """Raised when API rate limits are exceeded.
 
-    The Apple Search Ads API has rate limits that, when exceeded,
-    will return a 429 status code. This exception provides information
-    about when to retry.
+    The Apple Ads API returns HTTP 429 when rate limits are exceeded.
+    This exception exposes ``retry_after`` when retries are exhausted.
 
     Attributes:
         retry_after: Number of seconds to wait before retrying.
@@ -161,14 +164,14 @@ class RateLimitError(AppleSearchAdsError):
         Handling rate limits::
 
             import time
-            from asa_api_client.exceptions import RateLimitError
+            from asa_api_client import RateLimitError
 
             try:
-                campaigns = client.campaigns.list()
+                campaigns = client.campaigns.query()
             except RateLimitError as e:
                 print(f"Rate limited, waiting {e.retry_after}s")
-                time.sleep(e.retry_after)
-                campaigns = client.campaigns.list()
+                time.sleep(e.retry_after or 5)
+                campaigns = client.campaigns.query()
     """
 
     def __init__(
@@ -191,15 +194,15 @@ class RateLimitError(AppleSearchAdsError):
         self.retry_after = retry_after
 
 
-class ServerError(AppleSearchAdsError):
+class ServerError(AppleAdsError):
     """Raised when the API returns a server error (5xx).
 
-    This indicates a problem on Apple's side. These errors are
-    typically transient and can be retried.
+    This indicates a problem on Apple's side. Idempotent read requests
+    are retried automatically before raising this exception.
     """
 
 
-class NetworkError(AppleSearchAdsError):
+class NetworkError(AppleAdsError):
     """Raised when a network-level error occurs.
 
     This includes:
@@ -210,24 +213,24 @@ class NetworkError(AppleSearchAdsError):
     """
 
 
-class ConfigurationError(AppleSearchAdsError):
+class ConfigurationError(AppleAdsError):
     """Raised when the client is misconfigured.
 
-    This occurs before any API call is made, when the client
+    This occurs before a scoped API call is made when the client
     detects invalid configuration such as:
     - Missing required credentials
     - Invalid private key format
-    - Invalid org_id
+    - Missing ``ad_account_id`` on account-scoped endpoints
     """
 
 
-class PartialFailureError(AppleSearchAdsError):
+class PartialFailureError(AppleAdsError):
     """Raised when the API reports errors inside a successful HTTP response.
 
-    Both the Apple Ads Platform API v1 and legacy v5 endpoints can
-    return HTTP 2xx with an ``error`` block describing request-level or
-    per-item failures (e.g. in bulk operations). This exception surfaces
-    those instead of silently reporting success.
+    Apple Ads Platform API v1 endpoints can return HTTP 2xx with an
+    ``error`` block describing request-level or per-item failures (e.g.
+    in bulk operations when ``allow_partial_success=False``). This
+    exception surfaces those instead of silently reporting success.
 
     Attributes:
         details: List of error entries from the response ``error`` block.

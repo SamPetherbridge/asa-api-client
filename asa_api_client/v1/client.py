@@ -1,19 +1,15 @@
 """Main client for the Apple Ads Platform API v1.
 
-This module provides the AppleAdsClient class, the primary interface
-for the Apple Ads Platform API v1 (``https://api.ads.apple.com/v1``),
-which replaces the Campaign Management API v5 (sunset 2027-01-26).
-
-Authentication is unchanged from v5, so the same credentials work for
-both clients. The v1 API scopes requests to an *ad account* via the
-``X-AP-Context: adAccountId=...`` header instead of v5's ``orgId``.
+This module provides ``AppleAdsClient``, the client interface for the
+Apple Ads Platform API v1 (``https://api.ads.apple.com/v1``), scoping
+requests to an ad account via ``X-AP-Context: adAccountId=...``.
 """
 
 import os
 from collections.abc import Sequence
 from pathlib import Path
 from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 import httpx
 from pydantic import SecretStr
@@ -22,6 +18,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from asa_api_client.auth import Authenticator
 from asa_api_client.exceptions import ConfigurationError
 from asa_api_client.logging import get_logger
+
+if TYPE_CHECKING:
+    from asa_api_client.settings import Settings
 from asa_api_client.v1.models.ad_accounts import UserAcl
 from asa_api_client.v1.resources.ad_accounts import (
     AclResource,
@@ -302,6 +301,49 @@ class AppleAdsClient:
             key_id=settings.key_id,
             ad_account_id=settings.ad_account_id,
             org_id=settings.org_id or None,
+            private_key=(settings.private_key.get_secret_value() if settings.private_key else None),
+            private_key_path=settings.private_key_path,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            retry_initial_delay=retry_initial_delay,
+            retry_max_delay=retry_max_delay,
+            retry_jitter=retry_jitter,
+        )
+
+    @classmethod
+    def from_settings(
+        cls,
+        settings: "Settings",
+        *,
+        base_url: str = DEFAULT_V1_BASE_URL,
+        timeout: float = 30.0,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_initial_delay: float = DEFAULT_INITIAL_DELAY,
+        retry_max_delay: float = DEFAULT_MAX_DELAY,
+        retry_jitter: bool = True,
+    ) -> Self:
+        """Create a client from a :class:`~asa_api_client.Settings` instance.
+
+        Args:
+            settings: Validated configuration settings.
+            base_url: The API base URL.
+            timeout: Request timeout in seconds.
+            max_retries: Maximum retry attempts on transient failures.
+            retry_initial_delay: Initial exponential-backoff delay in seconds.
+            retry_max_delay: Upper bound on retry delay in seconds.
+            retry_jitter: Whether to add bounded random jitter to computed
+                backoff delays.
+
+        Returns:
+            A configured AppleAdsClient instance.
+        """
+        return cls(
+            client_id=settings.client_id,
+            team_id=settings.team_id,
+            key_id=settings.key_id,
+            ad_account_id=settings.ad_account_id,
+            org_id=settings.org_id,
             private_key=(settings.private_key.get_secret_value() if settings.private_key else None),
             private_key_path=settings.private_key_path,
             base_url=base_url,

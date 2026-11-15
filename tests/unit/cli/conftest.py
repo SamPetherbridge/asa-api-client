@@ -1,14 +1,16 @@
-"""Shared fixtures for CLI tests: env credentials and report JSON builders."""
+"""Shared fixtures for CLI tests: env credentials and v1 JSON builders."""
 
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from pytest_httpx import HTTPXMock
 
 TOKEN_URL = "https://appleid.apple.com/auth/oauth2/token"
-API = "https://api.searchads.apple.com/api/v5"
+V1_API = "https://api.ads.apple.com/v1"
 
 
 @pytest.fixture
@@ -39,62 +41,119 @@ def token_json() -> dict[str, Any]:
     return {"access_token": "tok", "token_type": "Bearer", "expires_in": 3600}
 
 
-def campaigns_json() -> dict[str, Any]:
-    """Two campaigns for two apps."""
-
-    def campaign(cid: int, name: str, adam: int) -> dict[str, Any]:
-        return {
-            "id": cid,
-            "orgId": 999,
-            "name": name,
-            "adamId": adam,
-            "countriesOrRegions": ["US"],
-            "status": "ENABLED",
-            "servingStatus": "RUNNING",
-            "modificationTime": "2026-08-01T00:00:00.000",
-            "displayStatus": "RUNNING",
-            "supplySources": ["APPSTORE_SEARCH_RESULTS"],
-            "dailyBudgetAmount": {"amount": "100", "currency": "USD"},
-        }
-
-    data = [campaign(1, "Campaign One", 111), campaign(2, "Campaign Two", 222)]
+def acls_json(account_id: int = 999, name: str = "Test Org") -> dict[str, Any]:
+    """Single-account ACL discovery response body."""
     return {
-        "data": data,
-        "pagination": {"totalResults": 2, "startIndex": 0, "itemsPerPage": 2},
+        "result": {
+            "acls": [
+                {
+                    "adAccount": {"id": account_id, "name": name, "orgId": account_id},
+                    "roles": ["Admin"],
+                }
+            ]
+        }
     }
 
 
-def report_json(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    """Wrap rows in the reporting response envelope."""
-    return {"data": {"reportingDataResponse": {"row": rows, "grandTotals": {}}}}
+def campaigns_json() -> dict[str, Any]:
+    """Two App Store campaigns for two apps (plus one Apple Maps campaign to skip)."""
+    return {
+        "result": [
+            {
+                "id": 1,
+                "name": "Campaign One",
+                "status": "ENABLED",
+                "promotedObjectType": "APPSTORE_APP",
+                "promotedObjectId": "111",
+                "dailyBudget": {"value": {"amount": "100", "currency": "USD"}},
+            },
+            {
+                "id": 2,
+                "name": "Campaign Two",
+                "status": "ENABLED",
+                "promotedObjectType": "APPSTORE_APP",
+                "promotedObjectId": "222",
+                "dailyBudget": {"value": {"amount": "100", "currency": "USD"}},
+            },
+            {
+                "id": 999,
+                "name": "Brand Campaign",
+                "status": "ENABLED",
+                "promotedObjectType": "BUSINESS_BRAND",
+                "promotedObjectId": "brand-1",
+            },
+        ],
+        "pagination": {"offset": 0, "pageSize": 500, "totalCount": 3},
+    }
+
+
+def report_json(
+    rows: list[dict[str, Any]], *, offset: int = 0, total_count: int | None = None
+) -> dict[str, Any]:
+    """Wrap v1 report rows in the ``{result, pagination}`` envelope."""
+    return {
+        "result": {"rows": rows},
+        "pagination": {
+            "offset": offset,
+            "pageSize": 5000,
+            "totalCount": total_count if total_count is not None else len(rows),
+        },
+    }
 
 
 def report_row(
     metadata: dict[str, Any], days: list[tuple[str, int, int, int, str]]
 ) -> dict[str, Any]:
-    """Build a report row with a DAILY granularity breakdown.
-
-    Args:
-        metadata: The row metadata (campaignId etc.).
-        days: Tuples of (date, impressions, taps, installs, spend).
-    """
-    granularity: list[dict[str, Any]] = [
+    """Build a v1 report row with a DAILY ``granularMetrics`` breakdown."""
+    granular: list[dict[str, Any]] = [
         {
             "date": d,
             "impressions": imp,
             "taps": taps,
             "totalInstalls": installs,
             "localSpend": {"amount": spend, "currency": "USD"},
+            "cpt": {"amount": "0.50", "currency": "USD"},
         }
         for d, imp, taps, installs, spend in days
     ]
     total = {
-        "impressions": sum(g["impressions"] for g in granularity),
-        "taps": sum(g["taps"] for g in granularity),
-        "totalInstalls": sum(g["totalInstalls"] for g in granularity),
+        "impressions": sum(g["impressions"] for g in granular),
+        "taps": sum(g["taps"] for g in granular),
+        "totalInstalls": sum(g["totalInstalls"] for g in granular),
         "localSpend": {
-            "amount": str(sum(float(g["localSpend"]["amount"]) for g in granularity)),
+            "amount": str(sum(float(g["localSpend"]["amount"]) for g in granular)),
             "currency": "USD",
         },
     }
-    return {"metadata": metadata, "total": total, "granularity": granularity}
+    return {"metadata": metadata, "totalMetrics": total, "granularMetrics": granular}
+
+
+def mock_v1_api(httpx_mock: HTTPXMock) -> None:
+    """Register reusable mocks for a full ``asa analyze`` happy-path run."""
+    httpx_mock.add_response(url=TOKEN_URL, json=token_json(), is_reusable=True)
+    httpx_mock.add_response(url=f"{V1_API}/acls", json=acls_json(), is_reusable=True)
+    httpx_mock.add_response(
+        url=f"{V1_API}/campaigns/query", json=campaigns_json(), is_reusable=True
+    )
+    httpx_mock.add_response(
+        url=re.compile(rf"{re.escape(V1_API)}/search/apps\?.*"),
+        json={"result": [], "pagination": {"offset": 0, "pageSize": 500, "totalCount": 0}},
+        is_reusable=True,
+    )
+    rows = [
+        report_row(
+            {"id": 1, "name": "Campaign One", "status": "ENABLED"},
+            [("2026-07-01", 1000, 100, 10, "50.0")],
+        )
+    ]
+    httpx_mock.add_response(
+        url=f"{V1_API}/reports/apps/campaigns/query",
+        json=report_json(rows),
+        is_reusable=True,
+    )
+    for entity in ("adgroups", "keywords", "searchterms", "ads"):
+        httpx_mock.add_response(
+            url=f"{V1_API}/reports/apps/{entity}/query",
+            json=report_json([]),
+            is_reusable=True,
+        )

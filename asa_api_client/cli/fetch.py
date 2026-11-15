@@ -1,157 +1,42 @@
-"""Async data fetching for the analyze command.
+"""Async data fetching for the ``asa analyze`` command.
 
-Owns everything network-shaped: scope resolution, chunked report
-fetching with bounded concurrency, the prior-period comparison fetch,
-and flattening API responses into daily DataFrames.
+Owns everything network-shaped against the Apple Ads Platform API v1:
+scope resolution, chunked report fetching with bounded concurrency and
+auto-pagination, the prior-period comparison fetch, and flattening v1
+report rows into daily DataFrames.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Protocol
+from typing import Any
 
 import pandas as pd
 
 from asa_api_client.cli.dates import SEARCH_TERM_LOOKBACK, chunk_windows, prior_window
-from asa_api_client.exceptions import AppleSearchAdsError
-from asa_api_client.models.reports import ReportingResponse
-
-
-class MoneyLike(Protocol):
-    """Anything money-shaped with a currency code."""
-
-    @property
-    def currency(self) -> str | None:
-        """ISO currency code (v1 responses may omit it)."""
-        ...
-
-
-class AppListing(Protocol):
-    """One app search result."""
-
-    @property
-    def adam_id(self) -> int | None:
-        """The App Store app ID."""
-        ...
-
-    @property
-    def app_name(self) -> str | None:
-        """The app display name."""
-        ...
-
-
-class CampaignListing(Protocol):
-    """One campaign from the scope listing."""
-
-    @property
-    def id(self) -> int | None:
-        """The campaign ID."""
-        ...
-
-    @property
-    def name(self) -> str | None:
-        """The campaign name."""
-        ...
-
-    @property
-    def adam_id(self) -> int:
-        """The promoted app's adam ID."""
-        ...
-
-    @property
-    def daily_budget_amount(self) -> MoneyLike | None:
-        """The daily budget, if set."""
-        ...
-
-    @property
-    def budget_amount(self) -> MoneyLike | None:
-        """The lifetime budget, if set."""
-        ...
-
-
-class FetchApps(Protocol):
-    """The app-search surface the fetch pipeline uses."""
-
-    def search(self, *, query: str, return_own_apps: bool) -> Iterable[AppListing]:
-        """Search apps eligible for (or owned by) the organization."""
-        ...
-
-
-class FetchCampaigns(Protocol):
-    """The campaign-listing surface the fetch pipeline uses."""
-
-    def list(self) -> Iterable[CampaignListing]:
-        """List the organization's campaigns."""
-        ...
-
-
-class FetchReports(Protocol):
-    """The async report surface the fetch pipeline uses."""
-
-    async def campaigns_async(
-        self,
-        start_date: date,
-        end_date: date,
-        /,
-        *,
-        campaign_ids: list[int] | None,
-        timezone: str,
-    ) -> ReportingResponse:
-        """Campaign-level daily report."""
-        ...
-
-    async def ad_groups_async(
-        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
-    ) -> ReportingResponse:
-        """Ad-group-level daily report for one campaign."""
-        ...
-
-    async def keywords_async(
-        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
-    ) -> ReportingResponse:
-        """Keyword-level daily report for one campaign."""
-        ...
-
-    async def search_terms_async(
-        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
-    ) -> ReportingResponse:
-        """Search-term-level daily report for one campaign."""
-        ...
-
-    async def ads_async(
-        self, campaign_id: int, start_date: date, end_date: date, /, *, timezone: str
-    ) -> ReportingResponse:
-        """Ad-level daily report for one campaign."""
-        ...
-
-
-class FetchClient(Protocol):
-    """The narrow client surface the fetch pipeline needs.
-
-    Satisfied structurally by the v5 ``AppleSearchAdsClient`` and by
-    ``cli.v1_adapter.V1FetchAdapter``.
-    """
-
-    @property
-    def apps(self) -> FetchApps:
-        """App search resource."""
-        ...
-
-    @property
-    def campaigns(self) -> FetchCampaigns:
-        """Campaigns resource."""
-        ...
-
-    @property
-    def reports(self) -> FetchReports:
-        """Reports resource."""
-        ...
-
-    async def aclose(self) -> None:
-        """Close async HTTP resources."""
-        ...
-
+from asa_api_client.exceptions import AppleAdsError
+from asa_api_client.v1.client import AppleAdsClient
+from asa_api_client.v1.models.campaigns import Campaign, PromotedObjectType
+from asa_api_client.v1.models.reports import (
+    AppsAdGroupReportRow,
+    AppsAdReportRow,
+    AppsCampaignReportRow,
+    AppsKeywordReportRow,
+    AppsMetrics,
+    AppsReportingAd,
+    AppsReportingAdGroup,
+    AppsReportingCampaign,
+    AppsReportingRequest,
+    AppsSearchTermReportRow,
+    ReportFilter,
+    ReportFilterOperator,
+    ReportGranularity,
+    ReportingKeyword,
+    ReportingSearchTerm,
+    ReportTimeRange,
+    ReportTimeZone,
+)
 
 LEVELS: list[tuple[str, str]] = [
     ("campaigns", "Campaigns"),
@@ -162,9 +47,8 @@ LEVELS: list[tuple[str, str]] = [
 ]
 LEVEL_LABELS = dict(LEVELS)
 CONCURRENCY = 5
-
-_SPEND_FIELDS = ("tap_install_cpi", "total_avg_cpi", "avg_cpt", "avg_cpm", "local_spend")
-_META_SPEND_FIELDS = ("bid_amount", "suggested_bid_amount")
+_REPORT_PAGE_SIZE = 5000
+_APP_SEARCH_LIMIT = 500
 
 
 class ScopeError(Exception):
@@ -193,54 +77,181 @@ class FetchResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def flatten_daily(resp: ReportingResponse) -> pd.DataFrame:
-    """Flatten a reporting response into one row per entity per day.
+def _enum_str(value: Any) -> str | None:
+    """Return an enum/string value as a plain string, or None."""
+    return None if value is None else str(value)
 
-    Uses each row's ``granularity`` breakdown (falling back to ``total``
-    when absent) so DAILY reports keep their per-day resolution —
-    ``ReportingResponse.to_dataframe`` drops it.
+
+def _campaign_metadata(meta: AppsReportingCampaign | None) -> dict[str, object]:
+    """Map v1 campaign report metadata to normalized snake_case columns."""
+    if meta is None:
+        return {}
+    return {
+        "campaign_id": meta.id,
+        "campaign_name": meta.name,
+        "campaign_status": _enum_str(meta.status),
+        "deleted": meta.deleted,
+    }
+
+
+def _ad_group_metadata(meta: AppsReportingAdGroup | None) -> dict[str, object]:
+    """Map v1 ad group report metadata to normalized snake_case columns."""
+    if meta is None:
+        return {}
+    return {
+        "campaign_id": meta.campaign_id,
+        "ad_group_id": meta.id,
+        "ad_group_name": meta.name,
+        "ad_group_status": _enum_str(meta.status),
+        "deleted": meta.deleted,
+    }
+
+
+def _keyword_metadata(meta: ReportingKeyword | None) -> dict[str, object]:
+    """Map v1 keyword report metadata to normalized snake_case columns."""
+    if meta is None:
+        return {}
+    return {
+        "campaign_id": meta.campaign_id,
+        "ad_group_id": meta.ad_group_id,
+        "ad_group_name": meta.ad_group.name if meta.ad_group else None,
+        "keyword_id": meta.id,
+        "keyword": meta.text,
+        "keyword_status": _enum_str(meta.status),
+        "match_type": _enum_str(meta.match_type),
+        "bid_amount": meta.bid.amount if meta.bid else None,
+        "deleted": meta.deleted,
+    }
+
+
+def _search_term_metadata(meta: ReportingSearchTerm | None) -> dict[str, object]:
+    """Map v1 search term report metadata to normalized snake_case columns."""
+    if meta is None:
+        return {}
+    keyword = meta.keyword
+    return {
+        "campaign_id": meta.campaign_id,
+        "ad_group_id": meta.ad_group_id,
+        "ad_group_name": meta.ad_group.name if meta.ad_group else None,
+        "search_term_text": meta.search_term_text,
+        "search_term_source": meta.search_term_source,
+        "keyword_id": keyword.id if keyword else None,
+        "keyword": keyword.text if keyword else None,
+        "match_type": _enum_str(keyword.match_type) if keyword else None,
+    }
+
+
+def _ad_metadata(meta: AppsReportingAd | None) -> dict[str, object]:
+    """Map v1 ad report metadata to normalized snake_case columns."""
+    if meta is None:
+        return {}
+    creative = meta.creative
+    return {
+        "campaign_id": meta.campaign_id,
+        "ad_group_id": meta.ad_group_id,
+        "ad_id": meta.id,
+        "ad_name": meta.name,
+        "ad_display_status": _enum_str(meta.display_status),
+        "creative_id": creative.id if creative else None,
+        "creative_type": _enum_str(creative.creative_type) if creative else None,
+        "language": (
+            creative.creative_spec.language if creative and creative.creative_spec else None
+        ),
+        "deleted": meta.deleted,
+    }
+
+
+def _metric_dict(entry: AppsMetrics) -> dict[str, object]:
+    """Flatten one ``AppsMetrics`` object into scalar snake_case columns."""
+    raw = entry.model_dump(by_alias=False, exclude_none=True, mode="json")
+    for v1_key, col_key in (("cpt", "avg_cpt"), ("cpm", "avg_cpm")):
+        if v1_key in raw:
+            raw[col_key] = raw.pop(v1_key)
+    for key, value in list(raw.items()):
+        if isinstance(value, dict) and "amount" in value:
+            raw[key] = value.get("amount")
+    return raw
+
+
+def flatten_rows(
+    rows: Sequence[Any],
+    metadata_fn: Callable[[Any], dict[str, object]],
+) -> pd.DataFrame:
+    """Flatten typed v1 report rows into one DataFrame row per entity-day.
+
+    Uses each row's ``granular_metrics`` breakdown (falling back to
+    ``total_metrics`` when absent) so DAILY reports preserve per-day
+    resolution.
 
     Args:
-        resp: A parsed reporting response.
+        rows: Sequence of v1 report row models.
+        metadata_fn: Callable mapping ``row.metadata`` to snake_case fields.
 
     Returns:
-        A DataFrame with snake_case metadata columns plus per-day metric
-        columns; spend fields flattened to their string amounts.
+        A DataFrame with snake_case metadata and metric columns.
     """
     records: list[dict[str, object]] = []
-    for row in resp.row:
-        meta = row.metadata.model_dump(by_alias=False, exclude_none=True)
-        for spend_field in _META_SPEND_FIELDS:
-            value = meta.get(spend_field)
-            if isinstance(value, dict):
-                meta[spend_field] = value.get("amount")
-        entries = row.granularity or ([row.total] if row.total is not None else [])
+    for row in rows:
+        meta = {k: v for k, v in metadata_fn(row.metadata).items() if v is not None}
+        entries: Sequence[AppsMetrics] = row.granular_metrics or (
+            [row.total_metrics] if row.total_metrics is not None else []
+        )
         for entry in entries:
-            metric = entry.model_dump(by_alias=False, exclude_none=True)
-            for spend_field in _SPEND_FIELDS:
-                value = metric.get(spend_field)
-                if isinstance(value, dict):
-                    metric[spend_field] = value.get("amount")
-            records.append({**meta, **metric})
+            records.append({**meta, **_metric_dict(entry)})
     return pd.DataFrame(records)
 
 
-def _app_names(client: FetchClient, adam_ids: list[int]) -> dict[int, str]:
-    """Best-effort lookup of app names for the org's adam IDs.
+def _time_range(
+    start: date, end: date, timezone: str, *, force_ortz: bool = False
+) -> ReportTimeRange:
+    """Build a DAILY v1 report time range."""
+    utc = timezone.upper() == "UTC" and not force_ortz
+    return ReportTimeRange(
+        start=start,
+        end=end,
+        time_zone=ReportTimeZone.UTC if utc else ReportTimeZone.ORTZ,
+        granularity=ReportGranularity.DAILY,
+    )
 
-    Falls back to ``App <adam_id>`` labels when the search endpoint
-    yields nothing (it requires a query and may not match).
 
-    Args:
-        client: The API client.
-        adam_ids: Adam IDs present in the campaign scope.
+def _campaign_filter(campaign_id: int) -> list[ReportFilter]:
+    """Build a single-campaign sub-entity report filter."""
+    return [
+        ReportFilter(
+            field="campaignId",
+            operator=ReportFilterOperator.EQUALS,
+            value=str(campaign_id),
+        )
+    ]
 
-    Returns:
-        Mapping of adam ID to display name.
-    """
+
+def _extract_app_campaign(
+    campaign: Campaign,
+) -> tuple[int | None, str | None, int, str | None] | None:
+    """Extract ``(id, name, adam_id, currency)`` for an App Store campaign."""
+    if campaign.promoted_object_type is not PromotedObjectType.APPSTORE_APP:
+        return None
+    try:
+        adam_id = int(campaign.promoted_object_id or "")
+    except ValueError:
+        return None
+    currency = (
+        campaign.daily_budget.value.currency
+        if campaign.daily_budget and campaign.daily_budget.value
+        else None
+    )
+    return campaign.id, campaign.name, adam_id, currency
+
+
+def _app_names(client: AppleAdsClient, adam_ids: list[int]) -> dict[int, str]:
+    """Best-effort lookup of app names for the account's adam IDs."""
     names: dict[int, str] = {}
     try:
-        for info in client.apps.search(query="", return_own_apps=True):
+        for info in client.apps.search(
+            query=None,
+            return_owned_apps=True,
+            limit=_APP_SEARCH_LIMIT,
+        ):
             if info.adam_id is not None and info.app_name:
                 names[int(info.adam_id)] = info.app_name
     except Exception:  # purely cosmetic lookup, never fatal
@@ -249,61 +260,153 @@ def _app_names(client: FetchClient, adam_ids: list[int]) -> dict[int, str]:
 
 
 def resolve_scope(
-    client: FetchClient, app_ids: list[int] | None
+    client: AppleAdsClient, app_ids: list[int] | None
 ) -> tuple[pd.DataFrame, str | None]:
-    """List campaigns once and build the campaign → app scope map.
+    """List App Store campaigns once and build the campaign → app scope map.
+
+    Apple Maps (``BUSINESS_BRAND``) campaigns are skipped because the
+    App Store report endpoints do not return rows for them.
 
     Args:
-        client: The API client.
-        app_ids: Adam IDs to scope to, or None for the whole org.
+        client: Configured v1 API client.
+        app_ids: Adam IDs to scope to, or None for all apps in the account.
 
     Returns:
-        Tuple of (meta frame with ``campaign_id``, ``campaign_name``,
-        ``adam_id``, ``app_name`` columns; org currency code or None).
+        Tuple of ``(meta_df, currency_code)``.
 
     Raises:
-        ScopeError: If no campaigns match the requested apps.
+        ScopeError: If no App Store campaigns match the requested scope.
     """
-    campaigns = list(client.campaigns.list())
+    extracted = [
+        item
+        for raw in client.campaigns.iter_all()
+        if (item := _extract_app_campaign(raw)) is not None
+    ]
     if app_ids:
-        campaigns = [c for c in campaigns if c.adam_id in set(app_ids)]
-    if not campaigns:
+        wanted = set(app_ids)
+        extracted = [c for c in extracted if c[2] in wanted]
+    if not extracted:
         detail = f" for app(s) {sorted(set(app_ids))}" if app_ids else ""
         raise ScopeError(f"No campaigns found{detail}")
 
-    currency: str | None = None
-    for campaign in campaigns:
-        money = campaign.daily_budget_amount or campaign.budget_amount
-        if money is not None:
-            currency = money.currency
-            break
-
-    adam_ids = sorted({c.adam_id for c in campaigns})
+    currency = next((c[3] for c in extracted if c[3] is not None), None)
+    adam_ids = sorted({c[2] for c in extracted})
     names = _app_names(client, adam_ids)
     meta = pd.DataFrame(
         [
             {
-                "campaign_id": c.id,
-                "campaign_name": c.name,
-                "adam_id": c.adam_id,
-                "app_name": names[c.adam_id],
+                "campaign_id": cid,
+                "campaign_name": cname,
+                "adam_id": adam_id,
+                "app_name": names[adam_id],
             }
-            for c in campaigns
+            for cid, cname, adam_id, _ in extracted
         ]
     )
     return meta, currency
 
 
 def _merge_names(df: pd.DataFrame, meta: pd.DataFrame) -> pd.DataFrame:
-    """Join campaign/app names onto a level frame by campaign_id."""
+    """Join campaign/app names onto a level frame by ``campaign_id``."""
     if df.empty or "campaign_id" not in df.columns:
         return df
     df = df.drop(columns=[c for c in ("campaign_name", "app_name", "adam_id") if c in df.columns])
     return df.merge(meta, on="campaign_id", how="left")
 
 
+async def _collect_async(aiter: AsyncIterator[Any]) -> list[Any]:
+    """Drain an async report iterator into a list."""
+    return [row async for row in aiter]
+
+
+async def _fetch_campaigns_frame(
+    client: AppleAdsClient,
+    start_date: date,
+    end_date: date,
+    *,
+    campaign_ids: list[int] | None,
+    timezone: str,
+) -> pd.DataFrame:
+    """Fetch and flatten a campaign-level daily report across all pages."""
+    filters = (
+        [
+            ReportFilter(
+                field="id",
+                operator=ReportFilterOperator.IN,
+                value=[str(cid) for cid in campaign_ids],
+            )
+        ]
+        if campaign_ids
+        else None
+    )
+    request = AppsReportingRequest(
+        filters=filters,
+        time_range=_time_range(start_date, end_date, timezone),
+    )
+    rows: list[AppsCampaignReportRow] = await _collect_async(
+        client.reports.iter_campaigns_async(request, page_size=_REPORT_PAGE_SIZE)
+    )
+    return flatten_rows(rows, _campaign_metadata)
+
+
+async def _fetch_ad_groups_frame(
+    client: AppleAdsClient, campaign_id: int, start_date: date, end_date: date, *, timezone: str
+) -> pd.DataFrame:
+    """Fetch and flatten an ad-group-level daily report for one campaign."""
+    request = AppsReportingRequest(
+        filters=_campaign_filter(campaign_id),
+        time_range=_time_range(start_date, end_date, timezone),
+    )
+    rows: list[AppsAdGroupReportRow] = await _collect_async(
+        client.reports.iter_ad_groups_async(request, page_size=_REPORT_PAGE_SIZE)
+    )
+    return flatten_rows(rows, _ad_group_metadata)
+
+
+async def _fetch_keywords_frame(
+    client: AppleAdsClient, campaign_id: int, start_date: date, end_date: date, *, timezone: str
+) -> pd.DataFrame:
+    """Fetch and flatten a keyword-level daily report for one campaign."""
+    request = AppsReportingRequest(
+        filters=_campaign_filter(campaign_id),
+        time_range=_time_range(start_date, end_date, timezone),
+    )
+    rows: list[AppsKeywordReportRow] = await _collect_async(
+        client.reports.iter_keywords_async(request, page_size=_REPORT_PAGE_SIZE)
+    )
+    return flatten_rows(rows, _keyword_metadata)
+
+
+async def _fetch_search_terms_frame(
+    client: AppleAdsClient, campaign_id: int, start_date: date, end_date: date, *, timezone: str
+) -> pd.DataFrame:
+    """Fetch and flatten a search-term-level daily report (always ORTZ)."""
+    request = AppsReportingRequest(
+        filters=_campaign_filter(campaign_id),
+        time_range=_time_range(start_date, end_date, timezone, force_ortz=True),
+    )
+    rows: list[AppsSearchTermReportRow] = await _collect_async(
+        client.reports.iter_search_terms_async(request, page_size=_REPORT_PAGE_SIZE)
+    )
+    return flatten_rows(rows, _search_term_metadata)
+
+
+async def _fetch_ads_frame(
+    client: AppleAdsClient, campaign_id: int, start_date: date, end_date: date, *, timezone: str
+) -> pd.DataFrame:
+    """Fetch and flatten an ad-level daily report for one campaign."""
+    request = AppsReportingRequest(
+        filters=_campaign_filter(campaign_id),
+        time_range=_time_range(start_date, end_date, timezone),
+    )
+    rows: list[AppsAdReportRow] = await _collect_async(
+        client.reports.iter_ads_async(request, page_size=_REPORT_PAGE_SIZE)
+    )
+    return flatten_rows(rows, _ad_metadata)
+
+
 async def fetch_all(
-    client: FetchClient,
+    client: AppleAdsClient,
     meta: pd.DataFrame,
     start: date,
     end: date,
@@ -315,18 +418,13 @@ async def fetch_all(
     """Fetch all five reporting levels plus the prior campaign period.
 
     Args:
-        client: The API client.
+        client: Configured v1 API client.
         meta: Scope frame from :func:`resolve_scope`.
         start: Range start (inclusive).
         end: Range end (inclusive).
-        timezone: Reporting timezone passed to the API.
-        today: Current date (drives the search-term lookback clip).
+        timezone: Reporting timezone (``"UTC"`` or ``"ORTZ"``).
+        today: Current date (drives the 90-day search-term lookback clip).
         on_progress: Optional callback ``(level_key, completed, total)``.
-            Fires once with ``(level, 0, 0)`` for any level with zero
-            chunks to fetch (e.g. search terms when the whole requested
-            range is older than the trailing 90-day lookback), so callers
-            can treat that level as immediately complete rather than
-            waiting for a tick that will never come.
 
     Returns:
         A :class:`FetchResult` with per-level daily frames (names merged
@@ -334,12 +432,7 @@ async def fetch_all(
 
     Raises:
         LevelFetchError: If the current-period campaign window fails, or
-            every chunk of any other level fails. Prior-period campaign
-            window failures do not raise: the prior period only feeds
-            Summary-sheet KPI deltas, so a failure there (e.g. an
-            explicit range whose prior window predates the 730-day API
-            lookback) degrades to a warning and an empty/partial
-            ``prior_campaigns`` frame instead of aborting the run.
+            every chunk of any other level fails.
     """
     windows = chunk_windows(start, end)
     p_start, p_end = prior_window(start, end)
@@ -347,20 +440,17 @@ async def fetch_all(
     campaign_ids = [int(c) for c in meta["campaign_id"].tolist()]
 
     st_start = max(start, today - timedelta(days=SEARCH_TERM_LOOKBACK))
-    # The whole requested range can be older than the lookback (legal: the
-    # overall API lookback is 730 days). That's not "clipped to a smaller
-    # window" — it's "no search-term data available at all" — so it needs
-    # its own note and must not compute a reversed (st_start > end) range.
     st_out_of_range = st_start > end
     st_windows = [] if st_out_of_range else chunk_windows(st_start, end)
     st_clipped = st_start > start and not st_out_of_range
 
-    reports = client.reports
-    per_campaign: dict[str, Callable[[int, date, date], Awaitable[ReportingResponse]]] = {
-        "ad_groups": lambda cid, s, e: reports.ad_groups_async(cid, s, e, timezone=timezone),
-        "keywords": lambda cid, s, e: reports.keywords_async(cid, s, e, timezone=timezone),
-        "search_terms": lambda cid, s, e: reports.search_terms_async(cid, s, e, timezone=timezone),
-        "ads": lambda cid, s, e: reports.ads_async(cid, s, e, timezone=timezone),
+    per_campaign: dict[str, Callable[[int, date, date], Awaitable[pd.DataFrame]]] = {
+        "ad_groups": lambda cid, s, e: _fetch_ad_groups_frame(client, cid, s, e, timezone=timezone),
+        "keywords": lambda cid, s, e: _fetch_keywords_frame(client, cid, s, e, timezone=timezone),
+        "search_terms": lambda cid, s, e: _fetch_search_terms_frame(
+            client, cid, s, e, timezone=timezone
+        ),
+        "ads": lambda cid, s, e: _fetch_ads_frame(client, cid, s, e, timezone=timezone),
     }
     level_windows = {key: st_windows if key == "search_terms" else windows for key in per_campaign}
 
@@ -368,9 +458,6 @@ async def fetch_all(
     totals |= {key: len(level_windows[key]) * len(campaign_ids) for key in per_campaign}
     done = dict.fromkeys(totals, 0)
 
-    # A level with zero chunks (e.g. search terms entirely outside the
-    # 90-day lookback) never has a chunk task to fire _tick from, so it
-    # would otherwise never report progress at all.
     if on_progress is not None:
         for level, total in totals.items():
             if total == 0:
@@ -391,10 +478,10 @@ async def fetch_all(
     async def _campaign_window(win: tuple[date, date], *, prior: bool) -> None:
         async with semaphore:
             try:
-                resp = await reports.campaigns_async(
-                    win[0], win[1], campaign_ids=campaign_ids, timezone=timezone
+                frame = await _fetch_campaigns_frame(
+                    client, win[0], win[1], campaign_ids=campaign_ids, timezone=timezone
                 )
-            except AppleSearchAdsError as exc:
+            except AppleAdsError as exc:
                 if prior:
                     warnings.append(
                         f"Prior period: window {win[0]}-{win[1]} failed: {exc}; "
@@ -406,14 +493,14 @@ async def fetch_all(
                 ) from exc
             finally:
                 _tick("campaigns")
-            (prior_frames if prior else frames["campaigns"]).append(flatten_daily(resp))
+            (prior_frames if prior else frames["campaigns"]).append(frame)
 
     async def _chunk(level: str, cid: int, win: tuple[date, date]) -> None:
         label = LEVEL_LABELS[level]
         async with semaphore:
             try:
-                resp = await per_campaign[level](cid, win[0], win[1])
-            except AppleSearchAdsError as exc:
+                frame = await per_campaign[level](cid, win[0], win[1])
+            except AppleAdsError as exc:
                 failures[level] += 1
                 message = f"{label}: campaign {cid} window {win[0]}-{win[1]} failed: {exc}"
                 warnings.append(message)
@@ -421,15 +508,13 @@ async def fetch_all(
                 return
             finally:
                 _tick(level)
-            frames[level].append(flatten_daily(resp))
+            frames[level].append(frame)
 
     tasks: list[Awaitable[None]] = []
     tasks += [_campaign_window(win, prior=False) for win in windows]
     tasks += [_campaign_window(win, prior=True) for win in prior_windows]
     for level in per_campaign:
         tasks += [_chunk(level, cid, win) for cid in campaign_ids for win in level_windows[level]]
-    # return_exceptions=True lets every in-flight request finish before we
-    # re-raise, so an aborting run doesn't leave tasks using a closing client.
     results = await asyncio.gather(*tasks, return_exceptions=True)
     for outcome in results:
         if isinstance(outcome, BaseException):

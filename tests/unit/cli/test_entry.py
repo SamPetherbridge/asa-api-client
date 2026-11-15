@@ -35,7 +35,7 @@ def test_missing_cli_extra_message(
 
 
 def test_help_runs() -> None:
-    """`asa --help` exits 0 and mentions the analyze subcommand."""
+    """`asa --help` exits 0 and mentions analyze and smoke subcommands."""
     from typer.testing import CliRunner
 
     from asa_api_client.cli.analyze import app
@@ -43,3 +43,8 @@ def test_help_runs() -> None:
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "analyze" in result.output
+    assert "smoke" in result.output
+
+    # Hidden v1-smoke alias also resolves cleanly
+    alias_help = CliRunner().invoke(app, ["v1-smoke", "--help"])
+    assert alias_help.exit_code == 0

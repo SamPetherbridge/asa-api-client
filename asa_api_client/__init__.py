@@ -1,32 +1,22 @@
 """Apple Ads API client library.
 
 A modern, fully-typed Python client for the Apple Ads Platform API v1
-(and legacy Campaign Management API v5) with async support, Pydantic
-models, and comprehensive logging.
+with async support, Pydantic models, and structured logging.
 
 Example:
-    Basic usage with the Platform API v1 client::
+    Basic usage with ``AppleAdsClient``::
 
-        from asa_api_client import AppleAdsClient
+        from asa_api_client import AppleAdsClient, Query
 
-        client = AppleAdsClient(
-            client_id="your-client-id",
-            team_id="your-team-id",
-            key_id="your-key-id",
-            ad_account_id="123456",
-            private_key_path="path/to/private-key.pem",
-        )
-
-        # Iterate all campaigns
-        for campaign in client.campaigns.iter_all():
-            print(campaign.name)
-
-        # Async usage
-        page = await client.campaigns.query_async()
+        with AppleAdsClient.from_env() as client:
+            for campaign in client.campaigns.iter_all(
+                Query().where("status", "EQUALS", "ENABLED")
+            ):
+                print(campaign.name)
 """
 
-from asa_api_client.client import AppleSearchAdsClient
 from asa_api_client.exceptions import (
+    AppleAdsError,
     AppleSearchAdsError,
     AuthenticationError,
     AuthorizationError,
@@ -41,20 +31,24 @@ from asa_api_client.exceptions import (
 from asa_api_client.logging import configure_logging
 from asa_api_client.settings import Settings
 from asa_api_client.v1.client import AppleAdsClient
+from asa_api_client.v1.query import FilterOperator, Query, SortOrder
 
 __all__ = [
     "AppleAdsClient",
-    "AppleSearchAdsClient",
+    "AppleAdsError",
     "AppleSearchAdsError",
     "AuthenticationError",
     "AuthorizationError",
     "ConfigurationError",
+    "FilterOperator",
     "NetworkError",
     "NotFoundError",
     "PartialFailureError",
+    "Query",
     "RateLimitError",
     "ServerError",
     "Settings",
+    "SortOrder",
     "ValidationError",
     "configure_logging",
 ]
