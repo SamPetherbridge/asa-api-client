@@ -15,3 +15,9 @@ def test_dunder_version_matches_pyproject() -> None:
     pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
     data = tomllib.loads(pyproject.read_text())
     assert asa_api_client.__version__ == data["project"]["version"]
+
+
+def test_pep561_py_typed_marker_present() -> None:
+    """Test PEP 561 py.typed marker exists inside the package directory."""
+    pkg_dir = Path(asa_api_client.__file__).resolve().parent
+    assert (pkg_dir / "py.typed").is_file()
