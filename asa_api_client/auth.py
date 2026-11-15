@@ -223,7 +223,7 @@ class Authenticator:
                 algorithm=ALGORITHM,
                 headers=headers,
             )
-        except jwt.exceptions.PyJWTError as e:
+        except (jwt.exceptions.PyJWTError, ValueError, TypeError) as e:
             raise AuthenticationError(f"Failed to generate client secret: {e}") from e
 
         self._client_secret = client_secret
@@ -422,8 +422,10 @@ class Authenticator:
         - ASA_CLIENT_ID
         - ASA_TEAM_ID
         - ASA_KEY_ID
-        - ASA_ORG_ID
         - ASA_PRIVATE_KEY or ASA_PRIVATE_KEY_PATH
+
+        Optional settings:
+        - ASA_ORG_ID
 
         Args:
             env_file: Path to .env file to load. Set to None to skip
@@ -480,5 +482,6 @@ class Authenticator:
             team_id=settings.team_id,
             key_id=settings.key_id,
             org_id=settings.org_id,
-            private_key=settings.get_private_key(),
+            private_key=(settings.private_key.get_secret_value() if settings.private_key else None),
+            private_key_path=settings.private_key_path,
         )
