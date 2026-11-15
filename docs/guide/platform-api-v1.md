@@ -86,7 +86,7 @@ Account-scoped parity resources: `campaigns`, `ad_groups`, `keywords`, `negative
 v1-exclusive capabilities:
 
 - **`recommendations`** — Target-CPA and daily-budget recommendations with `apply` / `dismiss` and `iter_target_cpas` / `iter_daily_budgets`
-- **`suggestions`** — Keyword, phrase, category, and target-CPA suggestions
+- **`suggestions`** — Keyword, phrase, category, and target-CPA suggestions (`iter_keywords`, `iter_phrases`, `iter_categories`)
 - **`insights`** — Impression share (`iter_impression_share`) and **search term popularity** (`iter_search_term_popularity`)
 - **`change_history`** — Account audit trail (`query` / `iter_all` / `get_details`)
 - **`bulk`** — Bulk keyword and negative-keyword `create_*`, `update_*`, and `delete_*` (lists over 5,000 items are automatically split into 5,000-item batches)

@@ -4,6 +4,7 @@ Covers keyword, phrase, and category suggestion queries plus the
 Target CPA suggestion for new Maximize Conversions campaigns.
 """
 
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, TypeVar
 
 from asa_api_client.v1.models.base import V1Model, V1Page, V1Pagination
@@ -192,3 +193,148 @@ class SuggestionResource(V1Resource[KeywordSuggestion, KeywordSuggestion, Keywor
         """
         data = await self._request_async("POST", _TARGET_CPAS_PATH, json=self._payload(query))
         return TargetCpaSuggestion.model_validate(data.get("result") or {})
+
+    @staticmethod
+    def _has_more_items(page: V1Page[M], offset: int, page_size: int) -> bool:
+        """Determine whether additional suggestion pages remain."""
+        if not page.result:
+            return False
+        if page.pagination is not None and page.pagination.total_count is not None:
+            return offset + len(page.result) < page.pagination.total_count
+        return len(page.result) >= page_size
+
+    def _iter_suggestions(
+        self,
+        path: str,
+        model: type[M],
+        query: Query | None,
+        page_size: int,
+    ) -> Iterator[M]:
+        """Iterate across pages of a suggestion list endpoint."""
+        base_payload = self._payload(query)
+        offset = 0
+        while True:
+            payload = {
+                **base_payload,
+                "pagination": {
+                    "pageSize": page_size,
+                    "offset": offset,
+                    "fetchTotalCount": True,
+                },
+            }
+            page = self._page_of(model, self._request("POST", path, json=payload))
+            yield from page
+            if not self._has_more_items(page, offset, page_size):
+                break
+            offset += len(page)
+
+    async def _iter_suggestions_async(
+        self,
+        path: str,
+        model: type[M],
+        query: Query | None,
+        page_size: int,
+    ) -> AsyncIterator[M]:
+        """Iterate across pages of a suggestion list endpoint asynchronously."""
+        base_payload = self._payload(query)
+        offset = 0
+        while True:
+            payload = {
+                **base_payload,
+                "pagination": {
+                    "pageSize": page_size,
+                    "offset": offset,
+                    "fetchTotalCount": True,
+                },
+            }
+            data = await self._request_async("POST", path, json=payload)
+            page = self._page_of(model, data)
+            for item in page:
+                yield item
+            if not self._has_more_items(page, offset, page_size):
+                break
+            offset += len(page)
+
+    def iter_keywords(
+        self, query: Query | None = None, *, page_size: int = 500
+    ) -> Iterator[KeywordSuggestion]:
+        """Iterate over all keyword suggestions with automatic pagination.
+
+        Args:
+            query: Optional query with promoted-object filters and sorting.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`KeywordSuggestion` across all pages.
+        """
+        return self._iter_suggestions(_KEYWORDS_PATH, KeywordSuggestion, query, page_size)
+
+    def iter_keywords_async(
+        self, query: Query | None = None, *, page_size: int = 500
+    ) -> AsyncIterator[KeywordSuggestion]:
+        """Iterate over all keyword suggestions asynchronously.
+
+        Args:
+            query: Optional query with promoted-object filters and sorting.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`KeywordSuggestion` across all pages.
+        """
+        return self._iter_suggestions_async(_KEYWORDS_PATH, KeywordSuggestion, query, page_size)
+
+    def iter_phrases(
+        self, query: Query | None = None, *, page_size: int = 500
+    ) -> Iterator[PhraseSuggestion]:
+        """Iterate over all phrase suggestions with automatic pagination.
+
+        Args:
+            query: Optional query with promoted-object filters and sorting.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`PhraseSuggestion` across all pages.
+        """
+        return self._iter_suggestions(_PHRASES_PATH, PhraseSuggestion, query, page_size)
+
+    def iter_phrases_async(
+        self, query: Query | None = None, *, page_size: int = 500
+    ) -> AsyncIterator[PhraseSuggestion]:
+        """Iterate over all phrase suggestions asynchronously.
+
+        Args:
+            query: Optional query with promoted-object filters and sorting.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`PhraseSuggestion` across all pages.
+        """
+        return self._iter_suggestions_async(_PHRASES_PATH, PhraseSuggestion, query, page_size)
+
+    def iter_categories(
+        self, query: Query | None = None, *, page_size: int = 500
+    ) -> Iterator[CategorySuggestion]:
+        """Iterate over all category suggestions with automatic pagination.
+
+        Args:
+            query: Optional query with filters and sorting.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`CategorySuggestion` across all pages.
+        """
+        return self._iter_suggestions(_CATEGORIES_PATH, CategorySuggestion, query, page_size)
+
+    def iter_categories_async(
+        self, query: Query | None = None, *, page_size: int = 500
+    ) -> AsyncIterator[CategorySuggestion]:
+        """Iterate over all category suggestions asynchronously.
+
+        Args:
+            query: Optional query with filters and sorting.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`CategorySuggestion` across all pages.
+        """
+        return self._iter_suggestions_async(_CATEGORIES_PATH, CategorySuggestion, query, page_size)

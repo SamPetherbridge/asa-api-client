@@ -5,6 +5,7 @@ managed in App Store Connect and surface here after a short
 propagation delay.
 """
 
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -139,3 +140,114 @@ class ProductPageResource(
             "POST", f"/apps/{adam_id}/locale-details/query", json=payload
         )
         return self._parse_typed_page(data, AppLocaleDetails)
+
+    @staticmethod
+    def _has_more_locales(page: V1Page[M], offset: int, page_size: int) -> bool:
+        """Determine whether additional locale detail pages remain."""
+        if not page.result:
+            return False
+        if page.pagination is not None and page.pagination.total_count is not None:
+            return offset + len(page.result) < page.pagination.total_count
+        return len(page.result) >= page_size
+
+    def _iter_typed_pages(
+        self,
+        path: str,
+        model: type[M],
+        query: Query | None,
+        page_size: int,
+    ) -> Iterator[M]:
+        """Iterate across pages of a typed locale-details endpoint."""
+        offset = 0
+        while True:
+            payload = self._paged_payload(query, page_size, offset)
+            page = self._parse_typed_page(self._request("POST", path, json=payload), model)
+            yield from page
+            if not self._has_more_locales(page, offset, page_size):
+                break
+            offset += len(page)
+
+    async def _iter_typed_pages_async(
+        self,
+        path: str,
+        model: type[M],
+        query: Query | None,
+        page_size: int,
+    ) -> AsyncIterator[M]:
+        """Iterate across pages of a typed locale-details endpoint asynchronously."""
+        offset = 0
+        while True:
+            payload = self._paged_payload(query, page_size, offset)
+            data = await self._request_async("POST", path, json=payload)
+            page = self._parse_typed_page(data, model)
+            for item in page:
+                yield item
+            if not self._has_more_locales(page, offset, page_size):
+                break
+            offset += len(page)
+
+    def iter_locale_details(
+        self, query: Query, *, page_size: int = 100
+    ) -> Iterator[ProductPageLocaleDetails]:
+        """Iterate over all localized content entries for a product page.
+
+        Args:
+            query: Query with at least a ``productPageId`` EQUALS filter.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`ProductPageLocaleDetails` entry across all pages.
+        """
+        return self._iter_typed_pages(
+            "locale-details/query", ProductPageLocaleDetails, query, page_size
+        )
+
+    def iter_locale_details_async(
+        self, query: Query, *, page_size: int = 100
+    ) -> AsyncIterator[ProductPageLocaleDetails]:
+        """Iterate over all localized content entries asynchronously.
+
+        Args:
+            query: Query with at least a ``productPageId`` EQUALS filter.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`ProductPageLocaleDetails` entry across all pages.
+        """
+        return self._iter_typed_pages_async(
+            "locale-details/query", ProductPageLocaleDetails, query, page_size
+        )
+
+    def iter_app_locale_details(
+        self, adam_id: int, query: Query | None = None, *, page_size: int = 100
+    ) -> Iterator[AppLocaleDetails]:
+        """Iterate over an app's Default Product Page locale details.
+
+        Args:
+            adam_id: The App Store app identifier (Adam ID).
+            query: Optional query filter.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`AppLocaleDetails` entry across all pages.
+        """
+        return self._iter_typed_pages(
+            f"/apps/{adam_id}/locale-details/query", AppLocaleDetails, query, page_size
+        )
+
+    def iter_app_locale_details_async(
+        self, adam_id: int, query: Query | None = None, *, page_size: int = 100
+    ) -> AsyncIterator[AppLocaleDetails]:
+        """Iterate over an app's Default Product Page locale details asynchronously.
+
+        Args:
+            adam_id: The App Store app identifier (Adam ID).
+            query: Optional query filter.
+            page_size: Items per page.
+
+        Yields:
+            Each :class:`AppLocaleDetails` entry across all pages.
+        """
+        return self._iter_typed_pages_async(
+            f"/apps/{adam_id}/locale-details/query", AppLocaleDetails, query, page_size
+        )

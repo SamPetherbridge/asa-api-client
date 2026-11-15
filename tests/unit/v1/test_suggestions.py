@@ -303,3 +303,60 @@ class TestModels:
             "text": "travel",
             "popularity": 100,
         }
+
+
+class TestSuggestionAutoPagination:
+    """Tests for iter_keywords, iter_phrases, and iter_categories."""
+
+    def test_iter_keywords_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_keywords walks suggestion pages using totalCount."""
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/suggestions/keywords/query",
+            json={
+                "result": [{"text": "hotel", "popularity": 90}],
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/suggestions/keywords/query",
+            json={
+                "result": [{"text": "flight", "popularity": 85}],
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        texts = [
+            item.text for item in SuggestionResource(v1_client).iter_keywords(Query(), page_size=1)
+        ]
+        assert texts == ["hotel", "flight"]
+
+    async def test_iter_phrases_and_categories_async(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_phrases_async, iter_categories_async, and iter_keywords_async yield items."""
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/suggestions/phrases/query",
+            json={"result": [{"phrase": "book flight", "popularity": 72}]},
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/suggestions/categories/query",
+            json={"result": [{"category": "Travel", "popularity": 88}]},
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/suggestions/keywords/query",
+            json={"result": [{"text": "airfare", "popularity": 64}]},
+        )
+        phrases = [
+            p.phrase async for p in SuggestionResource(v1_client).iter_phrases_async(page_size=2)
+        ]
+        categories = [
+            c.category
+            async for c in SuggestionResource(v1_client).iter_categories_async(page_size=2)
+        ]
+        keywords = [
+            k.text async for k in SuggestionResource(v1_client).iter_keywords_async(page_size=2)
+        ]
+        assert phrases == ["book flight"]
+        assert categories == ["Travel"]
+        assert keywords == ["airfare"]

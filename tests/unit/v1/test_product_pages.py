@@ -300,3 +300,53 @@ class TestEnums:
         dumped = detail.model_dump(by_alias=True, exclude_none=True, mode="json")
         assert dumped == {"deviceClasses": ["IPHONE", "IPAD"]}
         assert DeviceClass("IPHONE") is DeviceClass.IPHONE
+
+
+class TestProductPageLocaleAutoPagination:
+    """Tests for iter_locale_details and iter_app_locale_details."""
+
+    def test_iter_locale_details_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_locale_details pages across localized entries."""
+        mock_token(httpx_mock)
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/product-pages/locale-details/query",
+            json={
+                "result": [{**locale_details_json(), "languageCode": "en-US"}],
+                "pagination": {"offset": 0, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/product-pages/locale-details/query",
+            json={
+                "result": [{**locale_details_json(), "languageCode": "fr-FR"}],
+                "pagination": {"offset": 1, "pageSize": 1, "totalCount": 2},
+            },
+        )
+        codes = [
+            item.language_code
+            for item in ProductPageResource(v1_client).iter_locale_details(
+                Query().where("productPageId", "EQUALS", PAGE_ID), page_size=1
+            )
+        ]
+        assert codes == ["en-US", "fr-FR"]
+
+    async def test_iter_app_locale_details_async_walks_pages(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test iter_app_locale_details_async yields default product page locales."""
+        mock_token(httpx_mock)
+        entry = locale_details_json()
+        del entry["productPageId"]
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/apps/1053807572/locale-details/query",
+            json={"result": [{**entry, "languageCode": "de-DE"}]},
+        )
+        codes = [
+            item.language_code
+            async for item in ProductPageResource(v1_client).iter_app_locale_details_async(
+                1053807572, page_size=2
+            )
+        ]
+        assert codes == ["de-DE"]
