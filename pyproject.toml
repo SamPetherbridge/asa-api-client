@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asa-api-client"
-version = "0.6.1"
-description = "A modern Python client for the Apple Ads API with full type safety and async support"
+version = "1.0.0"
+description = "A modern Python client for the Apple Ads Platform API v1 with full type safety and async support"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
@@ -21,7 +21,7 @@ keywords = [
     "pydantic",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
