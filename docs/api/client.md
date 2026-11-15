@@ -8,12 +8,22 @@
       show_source: false
       members:
         - from_env
+        - resolve_ad_account
+        - resolve_ad_account_async
+        - with_account
+        - close
+        - aclose
         - campaigns
         - ad_groups
         - keywords
         - negative_keywords
         - ads
         - creatives
+        - assets
+        - product_pages
+        - budget_orders
+        - apps
+        - geo
         - bulk
         - reports
         - brand_reports
@@ -23,6 +33,13 @@
         - change_history
         - ad_accounts
         - acls
+        - orgs
+        - advertiser_resources
+        - brands
+        - business_categories
+        - brand_rejection_reasons
+        - locations
+        - location_groups
 
 ## Legacy Campaign Management API v5 Client
 
