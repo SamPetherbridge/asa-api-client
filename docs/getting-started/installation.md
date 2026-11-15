@@ -14,7 +14,7 @@ With optional extras:
 # DataFrame export (report.to_dataframe())
 uv add "asa-api-client[pandas]"
 
-# Command-line toolkit (asa analyze / asa v1-smoke)
+# Command-line toolkit (asa analyze / asa smoke)
 uv add "asa-api-client[cli]"
 ```
 
@@ -48,4 +48,4 @@ Core runtime dependencies:
 Optional extras:
 
 - `pandas` — `to_dataframe()` export on report responses
-- `cli` — `typer`, `rich`, `pandas`, and `xlsxwriter` for `asa analyze` and `asa v1-smoke`
+- `cli` — `typer`, `rich`, `pandas`, and `xlsxwriter` for `asa analyze` and `asa smoke`

@@ -1,6 +1,6 @@
 # Async Usage
 
-`AppleAdsClient` (and legacy `AppleSearchAdsClient`) provides both synchronous and asynchronous methods on the same client instance.
+`AppleAdsClient` provides both synchronous and asynchronous methods on the same client instance.
 
 ## Async Context Manager
 
@@ -41,9 +41,9 @@ async with client:
         print(campaign.name)
 ```
 
-## Concurrent Requests
+## Concurrent Requests & Multi-Account Scoping
 
-Use `asyncio.gather` to fetch multiple endpoints concurrently over a shared connection pool:
+Use `asyncio.gather` to fetch multiple endpoints (or multiple ad accounts via `client.with_account(...)`) concurrently over a shared OAuth token cache and HTTP connection pool:
 
 ```python
 from datetime import date

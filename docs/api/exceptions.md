@@ -3,7 +3,7 @@
 ## Exception Hierarchy
 
 ```text
-AppleSearchAdsError
+AppleAdsError (alias: AppleSearchAdsError)
 ├── AuthenticationError
 ├── AuthorizationError
 ├── ConfigurationError
@@ -17,16 +17,16 @@ AppleSearchAdsError
 
 All exceptions are exported directly from `asa_api_client`.
 
-## AppleSearchAdsError
+## AppleAdsError
 
-Base exception for all API and client errors.
+Base exception for all API and client errors (`AppleSearchAdsError` is preserved as an alias for compatibility with 0.x releases).
 
 ```python
-from asa_api_client import AppleSearchAdsError
+from asa_api_client import AppleAdsError
 
 try:
     client.campaigns.query()
-except AppleSearchAdsError as exc:
+except AppleAdsError as exc:
     print(f"API error ({exc.status_code}): {exc}")
 ```
 

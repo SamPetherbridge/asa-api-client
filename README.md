@@ -5,15 +5,15 @@
 [![License](https://img.shields.io/github/license/SamPetherbridge/asa-api-client.svg)](https://github.com/SamPetherbridge/asa-api-client/blob/main/LICENSE)
 [![CI](https://github.com/SamPetherbridge/asa-api-client/actions/workflows/ci.yml/badge.svg)](https://github.com/SamPetherbridge/asa-api-client/actions/workflows/ci.yml)
 
-A modern, fully-typed Python client for the **Apple Ads Platform API v1** (App Store and Apple Maps ads) with async support and Pydantic models. Also ships the legacy Campaign Management API v5 client (`AppleSearchAdsClient`) ahead of Apple's **January 26, 2027** v5 sunset.
+A modern, fully-typed Python client for the **Apple Ads Platform API v1** (App Store and Apple Maps ads) with async support and Pydantic models.
 
 ## Features
 
-- **Full Type Safety** — Complete type hints with strict `mypy` + Pydantic v2 compliance
-- **Platform API v1 First** — Campaigns, ad groups, keywords, ads, creatives, recommendations, insights, search-term popularity, change history, bulk operations, and Apple Maps brand ads
-- **Sync & Async** — Every method has an `_async` counterpart on the same client
-- **Automatic Pagination** — `iter_all()` and `iter_all_async()` helpers plus fluent `Query` builder
-- **Reports with Pandas** — Optional `report.to_dataframe()` export across all v1 and v5 report levels
+- **Full Type Safety** — Complete type hints with strict `mypy` + Pydantic v2 compliance (`py.typed` included)
+- **Complete Platform API v1 Coverage** — Campaigns, ad groups, keywords, ads, creatives, recommendations, insights, search-term popularity, suggestions, change history, bulk operations, and Apple Maps brand ads
+- **Sync & Async** — Every method has an `_async` counterpart on the same client, with multi-account scoping via `client.with_account(...)`
+- **Automatic Pagination** — `iter_*` and `*_async` helpers plus fluent `Query` builder across entity, report, insight, recommendation, suggestion, and audit endpoints
+- **Reports with Pandas** — `report.to_records()` and optional `report.to_dataframe()` export across all App Store and Apple Maps report levels
 - **Analysis CLI** — Generate multi-sheet Excel performance & search-popularity workbooks via `asa analyze`
 
 ## Installation
@@ -36,15 +36,14 @@ Optional extras:
 # DataFrame export (report.to_dataframe())
 uv add "asa-api-client[pandas]"
 
-# Excel analysis CLI (asa analyze / asa v1-smoke)
+# Excel analysis CLI (asa analyze / asa smoke)
 uv add "asa-api-client[cli]"
 ```
 
 ## Quick Start
 
 ```python
-from asa_api_client import AppleAdsClient
-from asa_api_client.v1 import Query
+from asa_api_client import AppleAdsClient, Query
 
 # Reads ASA_* variables from the environment or .env
 client = AppleAdsClient.from_env()
@@ -64,10 +63,10 @@ with client:
         print(f"{campaign.id}: {campaign.name} ({campaign.display_status})")
 ```
 
-Don't know your `ad_account_id` yet? Discover accessible accounts with the bundled read-only smoke check:
+Don't know your `ad_account_id` yet? Auto-resolve it via `client.resolve_ad_account()`, or run the bundled read-only smoke check:
 
 ```bash
-asa v1-smoke
+asa smoke
 ```
 
 ## Environment Variables
@@ -95,7 +94,7 @@ ASA_PRIVATE_KEY_PATH=private-key.pem
 ### Campaigns
 
 ```python
-from asa_api_client.v1 import Query
+from asa_api_client import Query
 from asa_api_client.v1.models.base import Money
 from asa_api_client.v1.models.campaigns import (
     BillingEvent,
@@ -169,7 +168,7 @@ from asa_api_client.v1.models.keywords import KeywordCreate, KeywordMatchType
 # Query keywords in an ad group
 keywords = client.keywords.query(Query().where("adGroupId", "EQUALS", str(ad_group_id)))
 
-# Bulk create, update, and delete keywords
+# Bulk create, update, and delete keywords (automatically batched at 5,000 items)
 created = client.bulk.create_keywords(
     [
         KeywordCreate(
@@ -239,11 +238,11 @@ pip install "asa-api-client[cli]"
 asa analyze --period 90d --output report.xlsx
 ```
 
-`asa analyze` uses the Platform API v1 by default (and auto-selects your ad account from `/v1/acls` when `ASA_AD_ACCOUNT_ID` is omitted). For full details, see the [CLI guide](https://asa-api-client.peth.au/guide/cli/).
+`asa analyze` auto-selects your ad account from `/v1/acls` when `ASA_AD_ACCOUNT_ID` is omitted. See the [CLI guide](https://asa-api-client.peth.au/guide/cli/) for all options.
 
 ## Legacy Campaign Management API v5
 
-`AppleSearchAdsClient` remains available for legacy v5 workflows until Apple shuts down v5 on **January 26, 2027** (`AppleSearchAdsClient` emits a `DeprecationWarning` on construction). See the [Platform API v1 migration guide](https://asa-api-client.peth.au/guide/platform-api-v1/) when migrating existing v5 code.
+Support for Apple's deprecated Campaign Management API v5 (`AppleSearchAdsClient`, sunset January 26, 2027) was removed in `1.0.0`. Pin `asa-api-client<1.0` if you need v5, or see the [v5 → v1 migration guide](https://asa-api-client.peth.au/guide/platform-api-v1/).
 
 ## License
 

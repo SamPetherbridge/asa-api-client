@@ -1,6 +1,6 @@
 # Authentication
 
-The Apple Ads API uses OAuth 2.0 client credentials signed with an ES256 (ECDSA P-256) private key. Both `AppleAdsClient` (Platform API v1) and legacy `AppleSearchAdsClient` (v5) share the exact same OAuth key pair.
+The Apple Ads Platform API v1 uses OAuth 2.0 client credentials signed with an ES256 (ECDSA P-256) private key.
 
 ## Getting API Credentials
 
@@ -54,11 +54,11 @@ with AppleAdsClient.from_env() as client:
     print(f"Using ad account {account_id}")
 ```
 
-Or run `asa v1-smoke` from the CLI (`pip install "asa-api-client[cli]"`), which lists accessible accounts and runs a read-only smoke test.
+Or run `asa smoke` from the CLI (`pip install "asa-api-client[cli]"`), which lists accessible accounts and runs a read-only smoke test.
 
 ### Direct Configuration
 
-Pass credentials directly in code using either a key file path or raw PEM string:
+Pass credentials directly in code using either a key file path, a raw PEM string, or a `Settings` object:
 
 ```python
 from asa_api_client import AppleAdsClient
@@ -73,15 +73,12 @@ client = AppleAdsClient(
 ```
 
 ```python
-client = AppleAdsClient(
-    client_id="SEARCHADS.xxx",
-    team_id="TEAM123",
-    key_id="KEY123",
-    ad_account_id="123456",
-    private_key="-----BEGIN EC PRIVATE KEY-----\n...",
-)
+from asa_api_client import AppleAdsClient, Settings
+
+settings = Settings(_env_file=".env.production")
+client = AppleAdsClient.from_settings(settings)
 ```
 
 ## Token Management
 
-The client automatically handles ES256 JWT creation, OAuth access-token caching, proactive token refresh before expiry, and `X-AP-Context` header injection.
+The client automatically handles ES256 JWT creation, coalesced OAuth access-token refreshes across concurrent tasks/threads, single-retry recovery on `401` token expiry, and `X-AP-Context` header injection.

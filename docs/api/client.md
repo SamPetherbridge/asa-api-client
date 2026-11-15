@@ -1,13 +1,12 @@
 # Client Reference
 
-## Platform API v1 Client
-
 ::: asa_api_client.AppleAdsClient
     options:
       show_root_heading: true
       show_source: false
       members:
         - from_env
+        - from_settings
         - resolve_ad_account
         - resolve_ad_account_async
         - with_account
@@ -40,14 +39,3 @@
         - brand_rejection_reasons
         - locations
         - location_groups
-
-## Legacy Campaign Management API v5 Client
-
-::: asa_api_client.AppleSearchAdsClient
-    options:
-      show_root_heading: true
-      show_source: false
-      members:
-        - from_env
-        - campaigns
-        - reports

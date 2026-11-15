@@ -1,6 +1,6 @@
 # CLI
 
-`asa-api-client` ships an optional command-line toolkit for generating multi-sheet Excel performance and search-popularity workbooks and validating Platform API v1 credentials.
+`asa-api-client` ships an optional command-line toolkit for generating multi-sheet Excel performance and search-popularity workbooks and validating Apple Ads credentials.
 
 ## Installation
 
@@ -21,7 +21,7 @@ The CLI reads the same environment variables (or `.env` file) as [`AppleAdsClien
 ## `asa analyze`
 
 ```bash
-# Whole account, last 30 full days (uses Platform API v1 by default)
+# Whole account, last 30 full days
 asa analyze
 
 # Scope to one app, last 90 days, custom output path
@@ -39,21 +39,20 @@ asa analyze --from 2026-08-01 --to 2026-08-31
 | `--output, -o` | Output file. Defaults to `asa-analysis-<app|org>-<YYYY-MM-DD>.xlsx`. |
 | `--timezone` | Reporting timezone (`UTC` or `ORTZ`). Default `UTC`. |
 | `--currency-format` | Excel number format for money cells. Default inferred from the account currency. |
-| `--api-version` | Apple Ads API backend: `v1` (default) or `v5` (legacy, sunset 2027-01-26). |
 
 The generated workbook includes:
 
 - **`Summary`** — Headline KPIs with prior-period deltas, daily spend/installs chart, top keywords, and wasted-spend callouts
 - **Analysis tabs** — Formatted tables per reporting level (campaigns, ad groups, keywords, search terms, ads)
-- **`Search Popularity`** — Latest storefront search-popularity scores (`1–100` and `1–5`) for your active keywords and search terms via the v1 Insights API
+- **`Search Popularity`** — Latest storefront search-popularity scores (`1–100` and `1–5`) for your active keywords and search terms via the Insights API
 - **Raw daily tabs** — Normalized daily data sheets at the back for custom pivoting
 
 Search term reports are served by Apple for the trailing 90 days; longer runs still succeed and annotate the search-term sheets.
 
-## `asa v1-smoke`
+## `asa smoke`
 
-Run a read-only smoke test against the live Platform API v1 to verify OAuth credentials, discover accessible ad accounts, and exercise core read/report endpoints:
+Run a read-only smoke test against the live Apple Ads Platform API v1 to verify OAuth credentials, discover accessible ad accounts, and exercise core read/report endpoints (`asa v1-smoke` is kept as a hidden alias):
 
 ```bash
-asa v1-smoke
+asa smoke
 ```

@@ -6,19 +6,17 @@
 from asa_api_client import AppleAdsClient
 
 # Load credentials from environment variables or .env
-client = AppleAdsClient.from_env()
-
-with client:
+with AppleAdsClient.from_env() as client:
     for campaign in client.campaigns.iter_all():
         print(f"{campaign.id}: {campaign.name} ({campaign.display_status})")
 ```
 
 ## Filtering & Sorting with `Query`
 
-Platform API v1 resources expose a `POST .../query` endpoint backed by the fluent `Query` builder:
+Resources expose `POST .../query` endpoints backed by the fluent `Query` builder:
 
 ```python
-from asa_api_client.v1 import Query
+from asa_api_client import Query
 
 with client:
     enabled = client.campaigns.query(
@@ -34,7 +32,7 @@ with client:
 
 ## Flat Resource Layout
 
-In Platform API v1, resources live directly on `client` and filter by parent IDs using `Query`:
+Resources live directly on `client` and filter by parent IDs using `Query`:
 
 ```python
 with client:
@@ -46,7 +44,7 @@ with client:
 
 ```python
 from asa_api_client import (
-    AppleSearchAdsError,
+    AppleAdsError,
     AuthenticationError,
     NotFoundError,
     PartialFailureError,
@@ -64,6 +62,6 @@ with client:
         print(f"Rate limited, retry after {exc.retry_after}")
     except AuthenticationError:
         print("Invalid credentials")
-    except AppleSearchAdsError as exc:
+    except AppleAdsError as exc:
         print(f"API error: {exc}")
 ```
