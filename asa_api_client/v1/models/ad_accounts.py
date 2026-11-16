@@ -8,6 +8,7 @@ resources (``GET /advertiser-resources``).
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated
 
 from pydantic import Field
 
@@ -54,16 +55,21 @@ class ProductFeatures(StrEnum):
     """Advertising capabilities of an ad account.
 
     Required on :class:`AdAccountCreate` and immutable after creation.
-    An ad account gets exactly one surface (App Store or Apple Maps).
+    An ad account gets one surface (App Store or Apple Maps). Live
+    ``GET /v1/ad-accounts/{id}`` responses also return
+    ``APPSTORE_APP_AUTOMATED`` for automated (Search Ads Basic) accounts.
 
     Attributes:
-        APPSTORE_APP_MANUAL: Authorizes App Store advertising; requires
-            a ``CONTENT_PROVIDER`` delegation.
+        APPSTORE_APP_MANUAL: Authorizes manual App Store advertising;
+            requires a ``CONTENT_PROVIDER`` delegation.
+        APPSTORE_APP_AUTOMATED: Automated App Store advertising surface
+            returned on automated App Store ad accounts.
         BUSINESS_BRAND_MANUAL: Authorizes Apple Maps advertising;
             requires a ``BUSINESS_BRAND`` delegation.
     """
 
     APPSTORE_APP_MANUAL = "APPSTORE_APP_MANUAL"
+    APPSTORE_APP_AUTOMATED = "APPSTORE_APP_AUTOMATED"
     BUSINESS_BRAND_MANUAL = "BUSINESS_BRAND_MANUAL"
 
 
@@ -308,7 +314,9 @@ class AdAccount(V1Model):
         default=None, alias="systemStatusReasons"
     )
     delegations: list[Delegation] | None = None
-    product_features: list[ProductFeatures] | None = Field(default=None, alias="productFeatures")
+    product_features: (
+        list[Annotated[ProductFeatures | str, Field(union_mode="left_to_right")]] | None
+    ) = Field(default=None, alias="productFeatures")
     creation_time: datetime | None = Field(default=None, alias="creationTime")
     modification_time: datetime | None = Field(default=None, alias="modificationTime")
 

@@ -270,6 +270,28 @@ class TestGetAdAccount:
             AdAccountSystemStatusReason.INVALID_PAYMENT_PROFILE,
         ]
 
+    def test_get_parses_automated_and_unknown_product_features(
+        self, httpx_mock: HTTPXMock, v1_client: AppleAdsClient
+    ) -> None:
+        """Test get() accepts APPSTORE_APP_AUTOMATED and forward-compatible feature strings."""
+        auto_body = {**AD_ACCOUNT_JSON, "productFeatures": ["APPSTORE_APP_AUTOMATED"]}
+        httpx_mock.add_response(url=f"{BASE_URL}/ad-accounts/565377349", json={"result": auto_body})
+        auto_acct = AdAccountResource(v1_client).get(565377349)
+        assert auto_acct.product_features == [ProductFeatures.APPSTORE_APP_AUTOMATED]
+        assert auto_acct.product_features is not None
+        assert auto_acct.product_features[0] is ProductFeatures.APPSTORE_APP_AUTOMATED
+
+        future_body = {
+            **AD_ACCOUNT_JSON,
+            "id": 565377350,
+            "productFeatures": ["FUTURE_UNLISTED_FEATURE"],
+        }
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/ad-accounts/565377350", json={"result": future_body}
+        )
+        future_acct = AdAccountResource(v1_client).get(565377350)
+        assert future_acct.product_features == ["FUTURE_UNLISTED_FEATURE"]
+
     def test_get_requires_account_context(self, v1_client: AppleAdsClient) -> None:
         """Test get() raises ConfigurationError without an ad_account_id."""
         v1_client.ad_account_id = None
