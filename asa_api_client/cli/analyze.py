@@ -17,7 +17,7 @@ from asa_api_client.cli.workbook import SummaryData, write_workbook
 from asa_api_client.exceptions import AppleAdsError, ConfigurationError
 from asa_api_client.v1.client import AppleAdsClient
 
-app = typer.Typer(no_args_is_help=True, add_completion=False)
+app = typer.Typer(name="asa-client", no_args_is_help=True, add_completion=False)
 app.command("smoke")(v1_smoke.command)
 app.command("v1-smoke", hidden=True)(v1_smoke.command)
 _err = Console(stderr=True)

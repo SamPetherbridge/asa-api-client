@@ -1,6 +1,17 @@
-"""Tests for the ``asa`` console entry point."""
+"""Tests for the ``asa-client`` console entry point."""
+
+import tomllib
+from pathlib import Path
 
 import pytest
+
+
+def test_project_scripts_owns_asa_client_not_asa() -> None:
+    """Ensure asa-api-client exposes `asa-client` and never overwrites `asa` from asa-api-cli."""
+    pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
+    scripts = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["scripts"]
+    assert scripts == {"asa-client": "asa_api_client.cli:main"}
+    assert "asa" not in scripts
 
 
 def test_main_importable() -> None:
@@ -35,7 +46,7 @@ def test_missing_cli_extra_message(
 
 
 def test_help_runs() -> None:
-    """`asa --help` exits 0 and mentions analyze and smoke subcommands."""
+    """`asa-client --help` exits 0 and mentions analyze and smoke subcommands."""
     from typer.testing import CliRunner
 
     from asa_api_client.cli.analyze import app

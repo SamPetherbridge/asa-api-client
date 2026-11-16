@@ -1,6 +1,6 @@
 # CLI
 
-`asa-api-client` ships an optional command-line toolkit for generating multi-sheet Excel performance and search-popularity workbooks and validating Apple Ads credentials.
+`asa-api-client` ships an optional `asa-client` command-line toolkit for generating multi-sheet Excel performance and search-popularity workbooks and validating Apple Ads credentials (the entry point is named `asa-client` so it coexists cleanly with the full `asa` CLI from [`asa-api-cli`](https://github.com/SamPetherbridge/asa-api-cli)).
 
 ## Installation
 
@@ -18,17 +18,17 @@ The CLI reads the same environment variables (or `.env` file) as [`AppleAdsClien
 - `ASA_PRIVATE_KEY` or `ASA_PRIVATE_KEY_PATH`
 - `ASA_AD_ACCOUNT_ID` (optional when a single ad account is accessible or when `ASA_ORG_ID` matches one of your `/v1/acls` accounts)
 
-## `asa analyze`
+## `asa-client analyze`
 
 ```bash
 # Whole account, last 30 full days
-asa analyze
+asa-client analyze
 
 # Scope to one app, last 90 days, custom output path
-asa analyze --app 123456789 --period 90d --output my-report.xlsx
+asa-client analyze --app 123456789 --period 90d --output my-report.xlsx
 
 # Explicit date range
-asa analyze --from 2026-08-01 --to 2026-08-31
+asa-client analyze --from 2026-08-01 --to 2026-08-31
 ```
 
 | Option | Description |
@@ -49,10 +49,10 @@ The generated workbook includes:
 
 Search term reports are served by Apple for the trailing 90 days; longer runs still succeed and annotate the search-term sheets.
 
-## `asa smoke`
+## `asa-client smoke`
 
-Run a read-only smoke test against the live Apple Ads Platform API v1 to verify OAuth credentials, discover accessible ad accounts, and exercise core read/report endpoints (`asa v1-smoke` is kept as a hidden alias):
+Run a read-only smoke test against the live Apple Ads Platform API v1 to verify OAuth credentials, discover accessible ad accounts, and exercise core read/report endpoints (`asa-client v1-smoke` is kept as a hidden alias):
 
 ```bash
-asa smoke
+asa-client smoke
 ```

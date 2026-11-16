@@ -34,7 +34,7 @@ with AppleAdsClient.from_env() as client:
 Or run the bundled read-only smoke check:
 
 ```bash
-asa smoke
+asa-client smoke
 ```
 
 ## Querying & Pagination

@@ -9,7 +9,7 @@ A modern, fully-typed Python client for the **Apple Ads Platform API v1** (App S
 - **Complete Platform API v1 Coverage** — Campaigns, ad groups, keywords, ads, creatives, recommendations, insights, search-term popularity, change history, bulk operations, and Apple Maps brand ads
 - **Automatic Pagination** — `iter_*` and `*_async` helpers plus fluent `Query` filters across entity, report, insight, recommendation, suggestion, and audit endpoints
 - **Reports with Pandas** — `report.to_dataframe()` and `report.to_records()` across all report levels
-- **Analysis CLI** — Multi-sheet Excel performance & search-popularity workbooks via `asa analyze`
+- **Analysis CLI** — Multi-sheet Excel performance & search-popularity workbooks via `asa-client analyze`
 
 ## Installation
 

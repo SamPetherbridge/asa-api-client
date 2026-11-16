@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asa-api-client"
-version = "1.0.0"
+version = "1.0.1"
 description = "A modern Python client for the Apple Ads Platform API v1 with full type safety and async support"
 readme = "README.md"
 license = "MIT"
@@ -77,7 +77,7 @@ Repository = "https://github.com/SamPetherbridge/asa-api-client"
 Issues = "https://github.com/SamPetherbridge/asa-api-client/issues"
 
 [project.scripts]
-asa = "asa_api_client.cli:main"
+asa-client = "asa_api_client.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["asa_api_client"]

@@ -1,4 +1,4 @@
-"""Console entry point for the ``asa`` CLI.
+"""Console entry point for the ``asa-client`` CLI.
 
 The CLI's dependencies (typer, rich, pandas, xlsxwriter) are an optional
 extra.  ``main`` guards the import so a bare install gets a clean install
@@ -11,7 +11,7 @@ _INSTALL_HINT = 'Install the CLI extra: pip install "asa-api-client[cli]"'
 
 
 def main() -> None:
-    """Run the ``asa`` command-line interface."""
+    """Run the ``asa-client`` command-line interface."""
     try:
         from asa_api_client.cli.analyze import app
     except ImportError:

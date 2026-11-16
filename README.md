@@ -14,7 +14,7 @@ A modern, fully-typed Python client for the **Apple Ads Platform API v1** (App S
 - **Sync & Async** — Every method has an `_async` counterpart on the same client, with multi-account scoping via `client.with_account(...)`
 - **Automatic Pagination** — `iter_*` and `*_async` helpers plus fluent `Query` builder across entity, report, insight, recommendation, suggestion, and audit endpoints
 - **Reports with Pandas** — `report.to_records()` and optional `report.to_dataframe()` export across all App Store and Apple Maps report levels
-- **Analysis CLI** — Generate multi-sheet Excel performance & search-popularity workbooks via `asa analyze`
+- **Analysis CLI** — Generate multi-sheet Excel performance & search-popularity workbooks via `asa-client analyze`
 
 ## Installation
 
@@ -36,7 +36,7 @@ Optional extras:
 # DataFrame export (report.to_dataframe())
 uv add "asa-api-client[pandas]"
 
-# Excel analysis CLI (asa analyze / asa smoke)
+# Excel analysis CLI (asa-client analyze / asa-client smoke)
 uv add "asa-api-client[cli]"
 ```
 
@@ -66,7 +66,7 @@ with client:
 Don't know your `ad_account_id` yet? Auto-resolve it via `client.resolve_ad_account()`, or run the bundled read-only smoke check:
 
 ```bash
-asa smoke
+asa-client smoke
 ```
 
 ## Environment Variables
@@ -231,14 +231,14 @@ asyncio.run(main())
 
 ## CLI
 
-Generate a formatted Excel performance and search-popularity workbook with `asa analyze`:
+Generate a formatted Excel performance and search-popularity workbook with `asa-client analyze` (named `asa-client` so it never collides with the full `asa` command from [`asa-api-cli`](https://github.com/SamPetherbridge/asa-api-cli)):
 
 ```bash
 pip install "asa-api-client[cli]"
-asa analyze --period 90d --output report.xlsx
+asa-client analyze --period 90d --output report.xlsx
 ```
 
-`asa analyze` auto-selects your ad account from `/v1/acls` when `ASA_AD_ACCOUNT_ID` is omitted. See the [CLI guide](https://asa-api-client.peth.au/guide/cli/) for all options.
+`asa-client analyze` auto-selects your ad account from `/v1/acls` when `ASA_AD_ACCOUNT_ID` is omitted. See the [CLI guide](https://asa-api-client.peth.au/guide/cli/) for all options.
 
 ## Legacy Campaign Management API v5
 

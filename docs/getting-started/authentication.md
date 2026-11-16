@@ -54,7 +54,7 @@ with AppleAdsClient.from_env() as client:
     print(f"Using ad account {account_id}")
 ```
 
-Or run `asa smoke` from the CLI (`pip install "asa-api-client[cli]"`), which lists accessible accounts and runs a read-only smoke test.
+Or run `asa-client smoke` from the CLI (`pip install "asa-api-client[cli]"`), which lists accessible accounts and runs a read-only smoke test.
 
 ### Direct Configuration
 
